@@ -58,13 +58,15 @@ local TEST_SPEED = 2.0
 -- (InterruptShakeAnim + InterruptGlow): a clipped swing tints red and shakes;
 -- a movement-delayed ranged swing tints amber. The tint holds full for
 -- TINT_HOLD seconds, then fades back to the skin's normal fill over TINT_FADE
--- seconds; the shake is Blizzard's exact InterruptShakeAnim recipe (~0.3 s,
--- 1-2 px diagonal jitter, gated on the ShakeStrengthUI CVar).
+-- seconds; the shake is a decaying ~0.7 s sway (Blizzard's exact recipe was
+-- tested in play and read as too subtle on a peripheral bar), gated on the
+-- ShakeStrengthUI CVar.
 local CLIP_TINT = { 1.0, 0.25, 0.20 }
 local DELAY_TINT = { 1.0, 0.60, 0.10 }
 local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
+local SHAKE_STEP = 0.04
 -- Early-landing (parry haste) feedback: the bar pops (scales up briefly)
 -- with a green glow overlay and fill tint. The glow is a separate overlay
 -- because the vertex tint modulates the native atlas fill's own colors -
@@ -160,25 +162,19 @@ overlay.testButton:SetScript("OnClick", function()
 	Bars:Test()
 end)
 
--- Interrupted-cast shake: Blizzard's exact InterruptShakeAnim recipe
--- (CastingBarFrame.xml on the forever branch) - a subtle 1-2px diagonal
--- jitter, ~0.3 s total: a 0.1 s hold, then four instantaneous translations
--- 0.05 s apart. Defined before CreateBar, which calls it - Lua locals are
--- lexically scoped.
+-- Interrupted-cast shake: alternating horizontal translation keyframes with
+-- decaying amplitude (~0.7 s). Blizzard's exact InterruptShakeAnim was tested
+-- in play (1-2 px jitter, ~0.3 s) and read as too subtle on a swing bar that
+-- lives in peripheral vision. Defined before CreateBar, which calls it - Lua
+-- locals are lexically scoped.
 local function CreateShakeAnimation(bar)
 	local group = bar:CreateAnimationGroup()
-	local offsets = {
-		{ 0, 0, 0.1, 0 },
-		{ -1, 1, 0.0, 0.05 },
-		{ 1, -2, 0.0, 0.05 },
-		{ 1, 2, 0.0, 0.05 },
-		{ -1, -1, 0.0, 0.05 },
-	}
+	-- Decaying amplitude: strongest jolt first, easing to rest, ~0.7 s total.
+	local offsets = { -6, 6, -5, 5, -4, 4, -3, 3, -2, 2, -1.5, 1.5, -1, 1, -0.5, 0.5, 0 }
 	for i = 1, #offsets do
 		local anim = group:CreateAnimation("Translation")
-		anim:SetOffset(offsets[i][1], offsets[i][2])
-		anim:SetDuration(offsets[i][3])
-		anim:SetStartDelay(offsets[i][4])
+		anim:SetOffset(offsets[i], 0)
+		anim:SetDuration(SHAKE_STEP)
 		anim:SetOrder(i)
 	end
 	return group
