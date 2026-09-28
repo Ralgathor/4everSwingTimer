@@ -250,6 +250,7 @@ local function CreateBar(hand)
 	bar.queuedGlow:SetSize(37, 12)
 	bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
 	bar.queuedGlow:Hide()
+	bar.glowWanted = false
 
 	-- Text lives on the StatusBar, not the bar frame: the StatusBar is
 	-- a child frame and child frames draw on top of all their parent's regions,
@@ -371,7 +372,9 @@ end
 -- (value * width from the statusbar's left), instead of anchoring to the
 -- fill texture's edge: in drain mode a parked bar sits at value 0, where the
 -- zero-width fill's edge left the tick and glow dangling outside the bar.
--- Clamped inside so the tick stays visible at the extremes.
+-- Clamped inside so the tick stays visible at the extremes. The glow trails
+-- to the tick's left and is hidden when it would extend outside the bar
+-- frame (e.g. the tick sitting at the left edge on an empty drain bar).
 function Bars:UpdateTickPosition(bar)
 	local statusWidth = bar.status:GetWidth()
 	if statusWidth <= 0 then
@@ -381,6 +384,13 @@ function Bars:UpdateTickPosition(bar)
 	local x = bar.status:GetValue() * statusWidth
 	x = math.max(pipWidth / 2, math.min(x, statusWidth - pipWidth / 2))
 	bar.pip:SetPoint("CENTER", bar.status, "LEFT", x, 0)
+	if bar.glowWanted then
+		local glowWidth = bar.queuedGlow:GetWidth()
+		local glowLeft = x - pipWidth / 2 - 2 - glowWidth
+		bar.queuedGlow:SetShown(glowLeft >= -STATUS_INSET_X)
+	else
+		bar.queuedGlow:Hide()
+	end
 end
 
 -- The fill appearance: the skin's own fill art always; the queued state is a
@@ -406,17 +416,12 @@ function Bars:ApplyFillStyle(bar)
 			texture:SetVertexColor(color[1], color[2], color[3])
 		end
 	end
-	-- The glow trails behind the tick: to its left when the bar fills up,
-	-- to its right when it drains (behind = the filled side either way).
-	-- ClearAllPoints first - differently named anchors coexist in WoW, and a
-	-- LEFT anchor added next to the creation-time RIGHT anchor stretched the
-	-- glow between two inverted points until it collapsed (invisible).
+	-- The glow trails to the tick's left (the cast bar's own anchor, +2px) -
+	-- no direction flip. UpdateTickPosition hides it when it would extend
+	-- outside the bar frame instead. ClearAllPoints first: differently named
+	-- anchors coexist in WoW, and conflicting anchors collapse regions.
 	bar.queuedGlow:ClearAllPoints()
-	if db.fill == "fill" then
-		bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
-	else
-		bar.queuedGlow:SetPoint("LEFT", bar.pip, "RIGHT", 2, 0)
-	end
+	bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
 	if queued then
 		-- The cast bar's pip: ui-castingbar-pip, scaled to the bar height.
 		local pipW, pipH, glowW, glowH = CastBarTickSize()
@@ -425,11 +430,11 @@ function Bars:ApplyFillStyle(bar)
 		bar.queuedGlow:SetSize(glowW, glowH)
 		bar.pip:SetVertexColor(1, 1, 1)
 		bar.pip:Show()
-		bar.queuedGlow:Show()
+		bar.glowWanted = true
 	else
 		bar.pip:SetAtlas(PIP_ATLAS, true)
 		bar.pip:SetVertexColor(1, 1, 1)
-		bar.queuedGlow:Hide()
+		bar.glowWanted = false
 		if db.skin == "native" then
 			bar.pip:Show()
 		else
