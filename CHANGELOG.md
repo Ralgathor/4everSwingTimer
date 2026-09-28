@@ -60,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is absent). Blizzard's exact InterruptShakeAnim recipe (1-2 px jitter,
   ~0.3 s) was tested in play and read as too subtle on a peripheral swing bar,
   so the shake keeps the stronger decaying ~0.7 s motion.
+- The cast bar's pip and glow art (8x20 pip, 37x12 glow) is drawn for a 13 px
+  bar; with a configurable bar height both now scale proportionally to it,
+  in the queued state and the red interrupt pip.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned

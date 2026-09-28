@@ -96,6 +96,14 @@ local CASTBAR_FILL_ATLAS = "ui-castingbar-filling-standard"
 local CASTBAR_PIP_ATLAS = "ui-castingbar-pip"
 local CASTBAR_PIP_RED_ATLAS = "ui-castingbar-pip-red"
 local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
+-- The cast bar's art is drawn for a 13px-tall bar (CastingBarFrame.xml:
+-- 8x20 pip, 37x12 glow); the bar height here is user-configurable, so the
+-- pip and glow scale proportionally to it.
+local CASTBAR_DESIGN_HEIGHT = 13
+
+local function CastBarScale()
+	return Addon.db.height / CASTBAR_DESIGN_HEIGHT
+end
 local QUEUE_POLL = 0.20
 
 local Bars = {}
@@ -370,9 +378,11 @@ function Bars:ApplyFillStyle(bar)
 	end
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 	if queued then
-		-- The cast bar's pip: ui-castingbar-pip, 8x20 (CastingBarFrame.xml).
+		-- The cast bar's pip: ui-castingbar-pip, scaled to the bar height.
+		local scale = CastBarScale()
 		bar.pip:SetAtlas(CASTBAR_PIP_ATLAS)
-		bar.pip:SetSize(8, 20)
+		bar.pip:SetSize(8 * scale, 20 * scale)
+		bar.queuedGlow:SetSize(37 * scale, 12 * scale)
 		bar.pip:SetVertexColor(1, 1, 1)
 		bar.pip:Show()
 		bar.queuedGlow:Show()
@@ -741,9 +751,11 @@ end
 -- clip event and in-flight stops.
 function Bars:InterruptFeedback(bar)
 	self:SetFillTint(bar, CLIP_TINT)
-	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas.
+	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas,
+	-- scaled to the bar height.
+	local scale = CastBarScale()
 	bar.pip:SetAtlas(CASTBAR_PIP_RED_ATLAS)
-	bar.pip:SetSize(8, 20)
+	bar.pip:SetSize(8 * scale, 20 * scale)
 	if bar.shake then
 		-- Blizzard gates the shake on the ShakeStrengthUI CVar; an absent CVar
 		-- (client without the setting) defaults to enabled.
