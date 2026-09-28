@@ -77,6 +77,7 @@ frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+frame:RegisterEvent("UNIT_INVENTORY_CHANGED")
 
 frame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
@@ -103,8 +104,21 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 		-- often not populated the player's inventory yet - every HasWeapon read
 		-- returns nil and the Always visibility mode hides all bars until some
 		-- other event fires. Entering the world (login, teleport, hearthstone)
-		-- is the point where the player's data is reliably present, so refresh.
+		-- triggers a refresh - and on a FIRST login the equipment data is
+		-- still streaming even here, so retry shortly and let
+		-- UNIT_INVENTORY_CHANGED below catch the moment it arrives.
 		if Addon.Bars then
+			Addon.Bars:UpdateVisibility()
+			C_Timer.After(1.0, function()
+				if Addon.Bars then
+					Addon.Bars:UpdateVisibility()
+				end
+			end)
+		end
+	elseif event == "UNIT_INVENTORY_CHANGED" then
+		-- The signal that the client has populated or changed the player's
+		-- equipment; at first login this is when weapon data actually exists.
+		if arg1 == "player" and Addon.Bars then
 			Addon.Bars:UpdateVisibility()
 		end
 	elseif event == "PLAYER_EQUIPMENT_CHANGED" then

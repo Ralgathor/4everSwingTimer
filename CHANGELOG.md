@@ -64,4 +64,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned
   nil. Visibility now refreshes on PLAYER_ENTERING_WORLD (login, teleport,
-  hearthstone), where the player's data is reliably present.
+  hearthstone) with a 1 s retry, and on UNIT_INVENTORY_CHANGED for the player -
+  the signal that equipment data has actually arrived, which on a first login
+  happens after the loading screen completes.
