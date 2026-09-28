@@ -96,13 +96,14 @@ local CASTBAR_FILL_ATLAS = "ui-castingbar-filling-standard"
 local CASTBAR_PIP_ATLAS = "ui-castingbar-pip"
 local CASTBAR_PIP_RED_ATLAS = "ui-castingbar-pip-red"
 local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
--- The cast bar's art is drawn for a 13px-tall bar (CastingBarFrame.xml:
--- 8x20 pip, 37x12 glow); the bar height here is user-configurable, so the
--- pip and glow scale proportionally to it.
+-- The statusbar is inset within the bar frame (5px sides, 4px top/bottom):
+-- the cast art scales to the STATUSBAR's height, not the frame's.
+local STATUS_INSET_X = 5
+local STATUS_INSET_Y = 4
 local CASTBAR_DESIGN_HEIGHT = 13
 
 local function CastBarScale()
-	return Addon.db.height / CASTBAR_DESIGN_HEIGHT
+	return math.max((Addon.db.height - STATUS_INSET_Y * 2) / CASTBAR_DESIGN_HEIGHT, 0.1)
 end
 local QUEUE_POLL = 0.20
 
@@ -216,8 +217,8 @@ local function CreateBar(hand)
 	bar.border:SetAllPoints(bar)
 
 	bar.status = CreateFrame("StatusBar", nil, bar)
-	bar.status:SetPoint("TOPLEFT", bar, "TOPLEFT", 5, -4)
-	bar.status:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -5, 4)
+	bar.status:SetPoint("TOPLEFT", bar, "TOPLEFT", STATUS_INSET_X, -STATUS_INSET_Y)
+	bar.status:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -STATUS_INSET_X, STATUS_INSET_Y)
 	bar.status:SetMinMaxValues(0, 1)
 	bar.status:SetValue(0)
 	bar.status:SetStatusBarTexture(FLAT_TEXTURE)

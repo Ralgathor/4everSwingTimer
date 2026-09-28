@@ -62,7 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so the shake keeps the stronger decaying ~0.7 s motion.
 - The cast bar's pip and glow art (8x20 pip, 37x12 glow) is drawn for a 13 px
   bar; with a configurable bar height both now scale proportionally to it,
-  in the queued state and the red interrupt pip.
+  in the queued state and the red interrupt pip. The scale is measured
+  against the inset statusbar's height (bar height minus the 4 px top and
+  bottom insets), not the bar frame's height - scaling against the frame
+  made the tick art grow about 1.8x out of proportion.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned
