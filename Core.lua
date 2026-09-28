@@ -40,6 +40,7 @@ local DEFAULTS = {
 	showSpeed = false,
 	showLabel = true,
 	showDelta = false,
+	highlightQueued = true,
 	enabled = {
 		mainhand = true,
 		offhand = true,

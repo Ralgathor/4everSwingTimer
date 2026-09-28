@@ -110,6 +110,15 @@ function Options:Init()
 		"Drain matches classic swing timer addons; Fill matches the game's own bar.")
 
 	Settings.CreateCheckbox(category,
+		ProxyBoolean(VAR_PREFIX .. "highlightQueued", "Highlight queued attacks", db.highlightQueued,
+			function() return db.highlightQueued end,
+			function(value)
+				db.highlightQueued = value
+				Addon.Bars:SetHighlightQueued(value)
+			end),
+		"While a next-melee ability (Heroic Strike, Cleave, Raptor Strike, Maul) is queued, the main-hand bar's text takes the queue color.")
+
+	Settings.CreateCheckbox(category,
 		ProxyBoolean(VAR_PREFIX .. "locked", "Locked", db.locked,
 			function() return db.locked end,
 			function(value)

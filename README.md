@@ -11,6 +11,8 @@ That means the bars also show what happens *between* swings:
 - cast-completion swing resets (the bar turns red and shakes, like the
   game's interrupted cast bar, then restarts),
 - parry-hasted early landings (the bar pops with a green glow),
+- queued next-melee abilities (Heroic Strike, Cleave, Raptor Strike, Maul) -
+  the main-hand bar's text takes the queue color while one is queued,
 - paused swings (desaturated, dimmed),
 - clipped swings,
 - movement-cancelled Auto Shot reschedules,

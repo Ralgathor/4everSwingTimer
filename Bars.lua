@@ -13,6 +13,7 @@ local GetInventoryItemID = GetInventoryItemID
 -- GetSpellCooldown -> C_Spell on this client); use C_Item.GetItemInfo when
 -- present. The library does the same for the cooldown global.
 local GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+local IsCurrentSpell = C_Spell and C_Spell.IsCurrentSpell
 -- Off-hand weapon check, two layers: the localized item-class name when
 -- GetItemClassInfo exists, plus the locale-independent numeric item classID
 -- (Weapon = 2) from GetItemInfo's extended returns as a fallback.
@@ -76,6 +77,15 @@ local HASTE_GLOW_ALPHA = 0.5
 local HASTE_GLOW_TIME = 0.5
 local HASTE_POP_SCALE = 1.15
 local STOP_GRACE = 0.10
+-- Queued next-melee highlight: while a next-melee ability is queued (base IDs;
+-- ranks resolve through the base), the main-hand bar's text takes the queue
+-- color. C_Spell.IsCurrentSpell probe-verified on the beta: plain booleans,
+-- true with Heroic Strike queued. The indicator is the text color, not a fill
+-- tint - a persistent fill tint would modulate the native atlas fill's own
+-- colors, and text is skin-independent.
+local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor Strike, Maul
+local QUEUED_COLOR = { 0.40, 0.90, 1.00 }
+local QUEUE_POLL = 0.20
 
 local Bars = {}
 Addon.Bars = Bars
@@ -231,6 +241,7 @@ local function CreateBar(hand)
 
 	bar.active = false
 	bar.paused = false
+	bar.queued = false
 	bar.speed = nil
 	bar.expiration = nil
 	bar:Hide()
@@ -308,6 +319,59 @@ function Bars:SetPaused(bar, paused)
 	end
 	bar.status:SetAlpha(paused and 0.55 or 1.0)
 	bar.time:SetVertexColor(paused and 0.6 or 1.0, paused and 0.6 or 1.0, paused and 0.6 or 1.0)
+	if not paused then
+		-- Restore the queued-aware text color (pause grays it out).
+		self:ApplyQueuedColor(bar)
+	end
+end
+
+-- Queued next-melee indicator: the bar's text color (skin-independent).
+function Bars:ApplyQueuedColor(bar)
+	local r, g, b = 1, 1, 1
+	if Addon.db.highlightQueued and bar.queued then
+		r, g, b = QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3]
+	end
+	bar.time:SetTextColor(r, g, b)
+	bar.label:SetTextColor(r, g, b)
+end
+
+-- Polled at QUEUE_POLL: no event exists for queued-state changes, and
+-- IsCurrentSpell is a cheap client-side call (four lookups per tick).
+function Bars:UpdateQueued()
+	local db = Addon.db
+	if not db.highlightQueued or not IsCurrentSpell then
+		return
+	end
+	local bar = self.bars and self.bars.mainhand
+	if not bar then
+		return
+	end
+	local queued = false
+	for i = 1, #QUEUED_SPELLS do
+		if IsCurrentSpell(QUEUED_SPELLS[i]) then
+			queued = true
+			break
+		end
+	end
+	if queued ~= bar.queued then
+		bar.queued = queued
+		self:ApplyQueuedColor(bar)
+	end
+end
+
+function Bars:SetHighlightQueued(enabled)
+	if not self.bars then
+		return
+	end
+	if not enabled then
+		-- Clear the indicator immediately; enabling needs no action - the
+		-- poll picks it up within QUEUE_POLL.
+		local bar = self.bars.mainhand
+		if bar then
+			bar.queued = false
+			self:ApplyQueuedColor(bar)
+		end
+	end
 end
 
 function Bars:ApplySkin()
@@ -732,6 +796,11 @@ function Bars:Enable(lib)
 	for i = 1, #LIB_EVENTS do
 		lib.RegisterCallback(Bars, LIB_EVENTS[i], Handle)
 	end
+
+	-- Queued next-melee highlight poll.
+	self.queueTicker = C_Timer.NewTicker(QUEUE_POLL, function()
+		Bars:UpdateQueued()
+	end)
 
 	self:ApplyAll()
 end
