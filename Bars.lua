@@ -78,11 +78,12 @@ local HASTE_GLOW_TIME = 0.5
 local HASTE_POP_SCALE = 1.15
 local STOP_GRACE = 0.10
 -- Queued next-melee highlight: while a next-melee ability is queued (base IDs;
--- ranks resolve through the base), the main-hand bar's text takes the queue
--- color. C_Spell.IsCurrentSpell probe-verified on the beta: plain booleans,
--- true with Heroic Strike queued. The indicator is the text color, not a fill
--- tint - a persistent fill tint would modulate the native atlas fill's own
--- colors, and text is skin-independent.
+-- ranks resolve through the base), the main-hand fill takes the queue color
+-- and the pip - the tick riding the fill edge - gets an additive glow,
+-- matching the casting bar's lit fill and spark treatment. C_Spell.
+-- IsCurrentSpell probe-verified on the beta: plain booleans, true with
+-- Heroic Strike queued. The fill swaps to the plain texture while queued
+-- because a vertex tint would modulate the native atlas fill's own colors.
 local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor Strike, Maul
 local QUEUED_COLOR = { 0.40, 0.90, 1.00 }
 local QUEUE_POLL = 0.20
@@ -205,6 +206,24 @@ local function CreateBar(hand)
 	bar.pip:SetAtlas(PIP_ATLAS, true)
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 
+	-- Queued-state glow on the pip, like the casting bar's spark: a soft
+	-- two-layer additive halo anchored to the tick, tracking the fill edge.
+	bar.queuedGlow = CreateFrame("Frame", nil, bar.status)
+	bar.queuedGlow:SetSize(18, 18)
+	bar.queuedGlow:SetPoint("CENTER", bar.pip, "CENTER")
+	local glowOuter = bar.queuedGlow:CreateTexture(nil, "OVERLAY")
+	glowOuter:SetAllPoints(bar.queuedGlow)
+	glowOuter:SetColorTexture(QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3])
+	glowOuter:SetAlpha(0.25)
+	glowOuter:SetBlendMode("ADD")
+	local glowInner = bar.queuedGlow:CreateTexture(nil, "OVERLAY")
+	glowInner:SetSize(6, 6)
+	glowInner:SetPoint("CENTER", bar.queuedGlow, "CENTER")
+	glowInner:SetColorTexture(1, 1, 1)
+	glowInner:SetAlpha(0.45)
+	glowInner:SetBlendMode("ADD")
+	bar.queuedGlow:Hide()
+
 	-- Text lives on the StatusBar, not the bar frame: the StatusBar is
 	-- a child frame and child frames draw on top of all their parent's regions,
 	-- so parented text would be hidden behind the fill texture. (The native
@@ -288,13 +307,7 @@ function Bars:FadeFillBack(bar, tint, gen)
 	if not texture then
 		return
 	end
-	local targetR, targetG, targetB
-	if Addon.db.skin == "native" then
-		targetR, targetG, targetB = 1, 1, 1
-	else
-		local color = FLAT_COLORS[bar.hand]
-		targetR, targetG, targetB = color[1], color[2], color[3]
-	end
+	local targetR, targetG, targetB = self:GetBaseFillColor(bar)
 	local stepDuration = TINT_FADE / TINT_STEPS
 	for step = 1, TINT_STEPS do
 		C_Timer.NewTimer(step * stepDuration, function()
@@ -319,20 +332,61 @@ function Bars:SetPaused(bar, paused)
 	end
 	bar.status:SetAlpha(paused and 0.55 or 1.0)
 	bar.time:SetVertexColor(paused and 0.6 or 1.0, paused and 0.6 or 1.0, paused and 0.6 or 1.0)
-	if not paused then
-		-- Restore the queued-aware text color (pause grays it out).
-		self:ApplyQueuedColor(bar)
+end
+
+-- The fill appearance: the queued state overrides the skin (queue color on
+-- the plain fill texture, pip shown and glowing); otherwise the skin's own
+-- fill and pip. Flash tints layer on top of this base.
+function Bars:ApplyFillStyle(bar)
+	local db = Addon.db
+	local queued = db.highlightQueued and bar.queued
+	if queued then
+		bar.status:SetStatusBarTexture(FLAT_TEXTURE)
+	else
+		if db.skin == "native" then
+			bar.status:SetStatusBarTexture(FILL_ATLAS[bar.hand])
+		else
+			bar.status:SetStatusBarTexture(FLAT_TEXTURE)
+		end
+	end
+	local texture = bar.status:GetStatusBarTexture()
+	if texture then
+		if queued then
+			texture:SetVertexColor(QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3])
+		elseif db.skin == "native" then
+			texture:SetVertexColor(1, 1, 1)
+		else
+			local color = FLAT_COLORS[bar.hand]
+			texture:SetVertexColor(color[1], color[2], color[3])
+		end
+	end
+	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
+	if queued then
+		bar.pip:Show()
+		bar.pip:SetVertexColor(QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3])
+		bar.queuedGlow:Show()
+	else
+		bar.pip:SetVertexColor(1, 1, 1)
+		bar.queuedGlow:Hide()
+		if db.skin == "native" then
+			bar.pip:Show()
+		else
+			bar.pip:Hide()
+		end
 	end
 end
 
--- Queued next-melee indicator: the bar's text color (skin-independent).
-function Bars:ApplyQueuedColor(bar)
-	local r, g, b = 1, 1, 1
-	if Addon.db.highlightQueued and bar.queued then
-		r, g, b = QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3]
+-- The base fill color an interrupt/delay tint fades back to.
+function Bars:GetBaseFillColor(bar)
+	local db = Addon.db
+	if db.highlightQueued and bar.queued then
+		return QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3]
 	end
-	bar.time:SetTextColor(r, g, b)
-	bar.label:SetTextColor(r, g, b)
+	if db.skin == "native" then
+		return 1, 1, 1
+	end
+	local color = FLAT_COLORS[bar.hand]
+	return color[1], color[2], color[3]
 end
 
 -- Polled at QUEUE_POLL: no event exists for queued-state changes, and
@@ -355,7 +409,7 @@ function Bars:UpdateQueued()
 	end
 	if queued ~= bar.queued then
 		bar.queued = queued
-		self:ApplyQueuedColor(bar)
+		self:ApplyFillStyle(bar)
 	end
 end
 
@@ -363,14 +417,15 @@ function Bars:SetHighlightQueued(enabled)
 	if not self.bars then
 		return
 	end
+	local bar = self.bars.mainhand
+	if not bar then
+		return
+	end
 	if not enabled then
 		-- Clear the indicator immediately; enabling needs no action - the
 		-- poll picks it up within QUEUE_POLL.
-		local bar = self.bars.mainhand
-		if bar then
-			bar.queued = false
-			self:ApplyQueuedColor(bar)
-		end
+		bar.queued = false
+		self:ApplyFillStyle(bar)
 	end
 end
 
@@ -383,17 +438,12 @@ function Bars:ApplySkin()
 		if native then
 			bar.bg:SetAtlas(BACKGROUND_ATLAS)
 			bar.border:SetAtlas(BORDER_ATLAS)
-			bar.status:SetStatusBarTexture(FILL_ATLAS[hand])
-			bar.pip:Show()
 		else
 			bar.bg:SetColorTexture(0, 0, 0, 0.55)
 			bar.border:SetColorTexture(0, 0, 0, 0.85)
-			bar.status:SetStatusBarTexture(FLAT_TEXTURE)
-			local color = FLAT_COLORS[hand]
-			bar.status:SetStatusBarColor(color[1], color[2], color[3])
-			bar.pip:Hide()
 		end
-		bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
+		-- The fill and pip follow the queued state first, the skin second.
+		self:ApplyFillStyle(bar)
 	end
 end
 

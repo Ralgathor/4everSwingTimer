@@ -44,11 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stopped) keeps the interrupted treatment.
 - Queued next-melee highlight: while a next-melee ability (Heroic Strike,
   Cleave, Raptor Strike, Maul - base spell IDs) is queued, the main-hand
-  bar's text takes a cyan queue color, polled every 0.2 s via
+  fill takes the queue color (the plain fill texture - a vertex tint over
+  the native atlas would modulate its own colors) and the pip - the tick
+  riding the fill edge - carries a two-layer additive glow, matching the
+  casting bar's lit fill and spark treatment. Polled every 0.2 s via
   C_Spell.IsCurrentSpell (probe-verified on the beta: plain booleans, true
-  with Heroic Strike queued). The indicator is the text color because a
-  persistent fill tint would modulate the native atlas fill's own colors.
-  On by default, with a settings toggle.
+  with Heroic Strike queued). On by default, with a settings toggle.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned
