@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ~0.3 s) was tested in play and read as too subtle on a peripheral swing bar,
   so the shake keeps the stronger decaying ~0.7 s motion.
 - The cast bar's pip and glow art (8x20 pip, 37x12 glow) is drawn for a 13 px
-  bar; its size here is an explicit setting, Tick size (8-24 px, default 14) -
+  bar; its size here is an explicit setting, Tick size (8-40 px, default 14) -
   several in-play rounds could not converge on a fixed rule (the cast bar's
   own overhang and linear scaling read too big, statusbar-flush and a 16 px
   cap read too small). The glow keeps the cast bar's proportions relative to
