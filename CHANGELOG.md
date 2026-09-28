@@ -84,3 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (value * width from the statusbar's left), clamped inside the bar, and the
   glow trails behind the tick per fill direction (left in fill mode, right in
   drain).
+- Fixed the glow not showing in drain mode: the direction-dependent glow
+  anchor was set without clearing the creation-time anchor, and differently
+  named WoW anchors coexist - the LEFT anchor added next to the RIGHT one
+  stretched the glow between two inverted points until it collapsed. The glow
+  anchor is now cleared before re-anchoring.

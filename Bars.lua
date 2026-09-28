@@ -408,6 +408,10 @@ function Bars:ApplyFillStyle(bar)
 	end
 	-- The glow trails behind the tick: to its left when the bar fills up,
 	-- to its right when it drains (behind = the filled side either way).
+	-- ClearAllPoints first - differently named anchors coexist in WoW, and a
+	-- LEFT anchor added next to the creation-time RIGHT anchor stretched the
+	-- glow between two inverted points until it collapsed (invisible).
+	bar.queuedGlow:ClearAllPoints()
 	if db.fill == "fill" then
 		bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
 	else

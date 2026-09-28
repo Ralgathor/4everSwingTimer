@@ -40,6 +40,11 @@ Do not commit `Libs/` or `.release/` — generated and gitignored.
 - Declare every variable `local` — the WoW environment is shared.
 - WoW API calls in hot paths are localized into upvalues at the top of the
   file (`local GetTime = GetTime` etc.).
+- **Anchor rule:** always `ClearAllPoints()` before `SetPoint` unless the new
+  anchor reuses the same anchor *name*. WoW anchors with different names
+  coexist on a region — they do not replace each other — and two horizontal
+  anchors (or an inverted pair) stretch or collapse the region. Three bugs in
+  this repo came from exactly that (pip initial anchor, glow side flip).
 - This client (mainline 12.x-era) has **removed many old global functions** —
   `GetSpellCooldown`, `GetItemInfo`, `InterfaceOptions_AddCategory` among them.
   Use the `C_*` namespaces (`C_Spell`, `C_Item`, the `Settings` system) with a
