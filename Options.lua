@@ -4,6 +4,13 @@
 -- Forever runs the mainline 12.x settings system: InterfaceOptions_AddCategory
 -- no longer exists there. Proxy settings are used (getValue/setValue) so every
 -- change applies live without depending on commit timing.
+--
+-- Dropdown contract on this client (verified against the shipped
+-- Blizzard_Settings.lua): CreateDropdown's `options` argument is passed to
+-- Settings.CreateDropdownOptionInserter as `optionsFunc` and is CALLED
+-- (ipairs(optionsFunc())) — it must be a function returning the entry list,
+-- never the list itself. Each entry needs controlType = Settings.ControlType.Radio.
+--
 -- The vertical layout supports checkbox, slider and dropdown controls only —
 -- there is no button control, which is why "Test bars" lives on the unlocked
 -- bar overlay and on the slash command instead of this panel.
@@ -57,11 +64,14 @@ local function ProxyString(variable, name, defaultValue, entries, onSet)
 				onSet(value)
 			end
 		end)
-	local container = Settings.CreateControlTextContainer()
-	for i = 1, #entries do
-		container:Add(entries[i].value, entries[i].label)
+	local function GetOptions()
+		local container = Settings.CreateControlTextContainer()
+		for i = 1, #entries do
+			container:Add(entries[i].value, entries[i].label, entries[i].tooltip, Settings.ControlType.Radio)
+		end
+		return container:GetData()
 	end
-	return setting, container:GetData()
+	return setting, GetOptions
 end
 
 -- ---------------------------------------------------------------------------
