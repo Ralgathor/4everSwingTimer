@@ -125,6 +125,21 @@ overlay.testButton:SetScript("OnClick", function()
 	Bars:Test()
 end)
 
+-- Interrupted-cast shake: alternating horizontal translation keyframes, the
+-- same mechanism the 12.x casting bar uses (InterruptShakeAnim). Defined before
+-- CreateBar, which calls it - Lua locals are lexically scoped.
+local function CreateShakeAnimation(bar)
+	local group = bar:CreateAnimationGroup()
+	local offsets = { -5, 5, -4, 4, -3, 3, -2, 2, -1, 1, 0 }
+	for i = 1, #offsets do
+		local anim = group:CreateAnimation("Translation")
+		anim:SetOffset(offsets[i], 0)
+		anim:SetDuration(SHAKE_STEP)
+		anim:SetOrder(i)
+	end
+	return group
+end
+
 local function CreateBar(hand)
 	local bar = CreateFrame("Frame", "FourEverSwingTimerBar" .. hand, anchor)
 	bar.hand = hand
@@ -180,18 +195,6 @@ end
 -- empty in drain mode.
 local function ParkedValue()
 	return Addon.db.fill == "fill" and 1 or 0
-end
-
-local function CreateShakeAnimation(bar)
-	local group = bar:CreateAnimationGroup()
-	local offsets = { -5, 5, -4, 4, -3, 3, -2, 2, -1, 1, 0 }
-	for i = 1, #offsets do
-		local anim = group:CreateAnimation("Translation")
-		anim:SetOffset(offsets[i], 0)
-		anim:SetDuration(SHAKE_STEP)
-		anim:SetOrder(i)
-	end
-	return group
 end
 
 -- Temporarily tints the fill, then restores the skin's normal color. Works for
