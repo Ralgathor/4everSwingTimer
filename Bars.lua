@@ -100,10 +100,18 @@ local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
 -- the cast art scales to the STATUSBAR's height, not the frame's.
 local STATUS_INSET_X = 5
 local STATUS_INSET_Y = 4
-local CASTBAR_DESIGN_HEIGHT = 13
+-- Tick art sizing: the cast bar's own spark (8x20 on a 13px bar) overhangs
+-- its bar, but that ratio reads too big on these bars (in-play feedback), so
+-- the pip is sized to fit flush within the statusbar; the glow keeps the
+-- cast bar's proportions relative to the pip (37x12 glow vs 8x20 pip).
+local CASTBAR_PIP_RATIO_W = 8 / 20
+local CASTBAR_GLOW_RATIO_W = 37 / 20
+local CASTBAR_GLOW_RATIO_H = 12 / 20
 
-local function CastBarScale()
-	return math.max((Addon.db.height - STATUS_INSET_Y * 2) / CASTBAR_DESIGN_HEIGHT, 0.1)
+local function CastBarTickSize()
+	local statusHeight = math.max(Addon.db.height - STATUS_INSET_Y * 2, 4)
+	return statusHeight * CASTBAR_PIP_RATIO_W, statusHeight,
+		statusHeight * CASTBAR_GLOW_RATIO_W, statusHeight * CASTBAR_GLOW_RATIO_H
 end
 local QUEUE_POLL = 0.20
 
@@ -380,10 +388,10 @@ function Bars:ApplyFillStyle(bar)
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 	if queued then
 		-- The cast bar's pip: ui-castingbar-pip, scaled to the bar height.
-		local scale = CastBarScale()
+		local pipW, pipH, glowW, glowH = CastBarTickSize()
 		bar.pip:SetAtlas(CASTBAR_PIP_ATLAS)
-		bar.pip:SetSize(8 * scale, 20 * scale)
-		bar.queuedGlow:SetSize(37 * scale, 12 * scale)
+		bar.pip:SetSize(pipW, pipH)
+		bar.queuedGlow:SetSize(glowW, glowH)
 		bar.pip:SetVertexColor(1, 1, 1)
 		bar.pip:Show()
 		bar.queuedGlow:Show()
@@ -754,9 +762,9 @@ function Bars:InterruptFeedback(bar)
 	self:SetFillTint(bar, CLIP_TINT)
 	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas,
 	-- scaled to the bar height.
-	local scale = CastBarScale()
+	local pipW, pipH = CastBarTickSize()
 	bar.pip:SetAtlas(CASTBAR_PIP_RED_ATLAS)
-	bar.pip:SetSize(8 * scale, 20 * scale)
+	bar.pip:SetSize(pipW, pipH)
 	if bar.shake then
 		-- Blizzard gates the shake on the ShakeStrengthUI CVar; an absent CVar
 		-- (client without the setting) defaults to enabled.
