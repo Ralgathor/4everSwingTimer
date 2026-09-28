@@ -237,7 +237,9 @@ local function CreateBar(hand)
 
 	bar.pip = bar.status:CreateTexture(nil, "OVERLAY")
 	bar.pip:SetAtlas(PIP_ATLAS, true)
-	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
+	-- Initial anchor matches UpdateTickPosition's form (a second, differently
+	-- named anchor would coexist with it and conflict).
+	bar.pip:SetPoint("CENTER", bar.status, "LEFT", 0, 0)
 
 	-- Queued-state spark glow, exactly the cast bar's StandardGlow: the
 	-- cast_standard_pipglow atlas in ADD blend, a streak to the left of the
