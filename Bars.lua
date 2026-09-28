@@ -464,6 +464,15 @@ function Bars:SwingStop(hand)
 	if not bar then
 		return
 	end
+	-- A stop while the swing is still in flight means the swing was cut short.
+	-- On WoW: Forever the common case is the cast-completion swing reset: the
+	-- library fires STOP+START there, and UNIT_SWING_TIMER_CLIPPED only fires
+	-- when a swing ends DURING a cast or channel, so the clip event alone misses
+	-- the completion reset. Any in-flight stop gets the interrupted-cast
+	-- treatment; the START that follows repaints the bar with the new swing.
+	if bar.active and bar.expiration and bar.expiration > GetTime() + 0.05 then
+		self:InterruptFeedback(bar)
+	end
 	bar.active = false
 	bar.expiration = nil
 	self:SetPaused(bar, false)
@@ -480,6 +489,16 @@ function Bars:SwingPaused(hand)
 	end
 end
 
+-- The interrupted-cast treatment (red tint + shake), shared by the clip event
+-- and in-flight stops.
+function Bars:InterruptFeedback(bar)
+	self:SetFillTint(bar, CLIP_TINT)
+	if bar.shake then
+		bar.shake:Stop()
+		bar.shake:Play()
+	end
+end
+
 -- A swing reset by a cast: the interrupted-cast treatment - the fill turns
 -- red and the bar shakes, decaying back to normal while the new swing runs.
 function Bars:SwingClipped(hand)
@@ -487,11 +506,7 @@ function Bars:SwingClipped(hand)
 	if not bar then
 		return
 	end
-	self:SetFillTint(bar, CLIP_TINT)
-	if bar.shake then
-		bar.shake:Stop()
-		bar.shake:Play()
-	end
+	self:InterruptFeedback(bar)
 end
 
 function Bars:SwingDelta(swingDelta)
