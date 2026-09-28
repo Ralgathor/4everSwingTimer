@@ -35,8 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parry-haste feedback: an early landing - an in-flight STOP followed by a
   START with the same weapon speed, the signature of the engine shortening
   the swing mid-flight (player parry; a mid-swing haste proc reads the
-  same) - bounces the bar vertically with a green tint, distinct from the
-  interrupt treatment. In-flight stops are classified after a short grace
-  period: START with the same speed is an early landing, START with a new
-  speed is a weapon swap, and no START at all (death, attack stopped) keeps
-  the interrupted treatment.
+  same) - pops the bar (brief 15% scale-up) with a green glow overlay and
+  fill tint, distinct from the interrupt treatment. The glow is a separate
+  overlay because a vertex tint modulates the native atlas fill's own
+  colors and reads muddy. In-flight stops are classified after a short
+  grace period: START with the same speed is an early landing, START with
+  a new speed is a weapon swap, and no START at all (death, attack
+  stopped) keeps the interrupted treatment.

@@ -63,12 +63,18 @@ local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
 local SHAKE_STEP = 0.04
--- Early-landing (parry haste) feedback: green tint plus a vertical bounce,
--- contrasting with the interrupt's red horizontal shake. A STOP is followed
--- by its START within one library call, so the stop cannot be classified
--- until a short grace period shows whether a START follows and with which
--- weapon speed.
-local HASTE_TINT = { 0.35, 1.00, 0.45 }
+-- Early-landing (parry haste) feedback: the bar pops (scales up briefly)
+-- with a green glow overlay and fill tint. The glow is a separate overlay
+-- because the vertex tint modulates the native atlas fill's own colors -
+-- green over amber reads muddy - while a plain overlay shows the intended
+-- color regardless of skin. A STOP is followed by its START within one
+-- library call, so the stop cannot be classified until a short grace period
+-- shows whether a START follows and with which weapon speed.
+local HASTE_TINT = { 0.30, 1.00, 0.40 }
+local HASTE_GLOW = { 0.25, 1.00, 0.35 }
+local HASTE_GLOW_ALPHA = 0.5
+local HASTE_GLOW_TIME = 0.5
+local HASTE_POP_SCALE = 1.15
 local STOP_GRACE = 0.10
 
 local Bars = {}
@@ -151,17 +157,21 @@ local function CreateShakeAnimation(bar)
 	return group
 end
 
--- Early-landing feedback: a quick vertical bounce (the interrupt shake is
--- horizontal, so the two read differently at a glance).
-local function CreateBounceAnimation(bar)
+-- Early-landing feedback: the bar scales up briefly and settles - far more
+-- visible than a small offset wiggle, and distinct from the interrupt's
+-- horizontal shake.
+local function CreatePopAnimation(bar)
 	local group = bar:CreateAnimationGroup()
-	local offsets = { 3, -3, 2.5, -2.5, 2, -2, 1.5, -1.5, 1, -1, 0.5, -0.5, 0 }
-	for i = 1, #offsets do
-		local anim = group:CreateAnimation("Translation")
-		anim:SetOffset(0, offsets[i])
-		anim:SetDuration(0.025)
-		anim:SetOrder(i)
-	end
+	local grow = group:CreateAnimation("Scale")
+	grow:SetScale(HASTE_POP_SCALE, HASTE_POP_SCALE)
+	grow:SetOrigin("CENTER", 0, 0)
+	grow:SetDuration(0.07)
+	grow:SetOrder(1)
+	local shrink = group:CreateAnimation("Scale")
+	shrink:SetScale(1 / HASTE_POP_SCALE, 1 / HASTE_POP_SCALE)
+	shrink:SetOrigin("CENTER", 0, 0)
+	shrink:SetDuration(0.15)
+	shrink:SetOrder(2)
 	return group
 end
 
@@ -203,8 +213,21 @@ local function CreateBar(hand)
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
 	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
 	bar.shake = CreateShakeAnimation(bar)
-	-- Early-landing (parry haste) bounce.
-	bar.bounce = CreateBounceAnimation(bar)
+	-- Early-landing (parry haste) pop and glow overlay.
+	bar.pop = CreatePopAnimation(bar)
+	bar.hasteGlow = bar.status:CreateTexture(nil, "OVERLAY")
+	bar.hasteGlow:SetAllPoints(bar.status)
+	bar.hasteGlow:SetColorTexture(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3], HASTE_GLOW_ALPHA)
+	bar.hasteGlow:SetAlpha(0)
+	bar.hasteGlow:Hide()
+	bar.hasteGlowFade = bar.hasteGlow:CreateAnimationGroup()
+	local hasteFade = bar.hasteGlowFade:CreateAnimation("Alpha")
+	hasteFade:SetFromAlpha(HASTE_GLOW_ALPHA)
+	hasteFade:SetToAlpha(0)
+	hasteFade:SetDuration(HASTE_GLOW_TIME)
+	bar.hasteGlowFade:SetScript("OnFinished", function()
+		bar.hasteGlow:Hide()
+	end)
 
 	bar.active = false
 	bar.paused = false
@@ -514,9 +537,14 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 				-- hastened swing simply lands early - a mid-swing haste proc
 				-- produces the same signature).
 				self:SetFillTint(bar, HASTE_TINT)
-				if bar.bounce then
-					bar.bounce:Stop()
-					bar.bounce:Play()
+				if bar.pop then
+					bar.pop:Stop()
+					bar.pop:Play()
+				end
+				if bar.hasteGlow and bar.hasteGlowFade then
+					bar.hasteGlow:Show()
+					bar.hasteGlowFade:Stop()
+					bar.hasteGlowFade:Play()
 				end
 			else
 				-- Different weapon speed: a weapon swap restart; the old swing
