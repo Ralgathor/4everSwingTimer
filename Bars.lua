@@ -14,6 +14,7 @@ local GetInventoryItemID = GetInventoryItemID
 -- present. The library does the same for the cooldown global.
 local GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 local IsCurrentSpell = C_Spell and C_Spell.IsCurrentSpell
+local GetCVar = GetCVar
 -- Off-hand weapon check, two layers: the localized item-class name when
 -- GetItemClassInfo exists, plus the locale-independent numeric item classID
 -- (Weapon = 2) from GetItemInfo's extended returns as a fallback.
@@ -57,13 +58,13 @@ local TEST_SPEED = 2.0
 -- (InterruptShakeAnim + InterruptGlow): a clipped swing tints red and shakes;
 -- a movement-delayed ranged swing tints amber. The tint holds full for
 -- TINT_HOLD seconds, then fades back to the skin's normal fill over TINT_FADE
--- seconds; the shake runs ~0.7 s with decaying amplitude.
+-- seconds; the shake is Blizzard's exact InterruptShakeAnim recipe (~0.3 s,
+-- 1-2 px diagonal jitter, gated on the ShakeStrengthUI CVar).
 local CLIP_TINT = { 1.0, 0.25, 0.20 }
 local DELAY_TINT = { 1.0, 0.60, 0.10 }
 local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
-local SHAKE_STEP = 0.04
 -- Early-landing (parry haste) feedback: the bar pops (scales up briefly)
 -- with a green glow overlay and fill tint. The glow is a separate overlay
 -- because the vertex tint modulates the native atlas fill's own colors -
@@ -91,6 +92,7 @@ local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor S
 -- is cast_standard_pipglow in ADD blend - a streak anchored to the pip's left.
 local CASTBAR_FILL_ATLAS = "ui-castingbar-filling-standard"
 local CASTBAR_PIP_ATLAS = "ui-castingbar-pip"
+local CASTBAR_PIP_RED_ATLAS = "ui-castingbar-pip-red"
 local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
 local QUEUE_POLL = 0.20
 
@@ -158,17 +160,25 @@ overlay.testButton:SetScript("OnClick", function()
 	Bars:Test()
 end)
 
--- Interrupted-cast shake: alternating horizontal translation keyframes, the
--- same mechanism the 12.x casting bar uses (InterruptShakeAnim). Defined before
--- CreateBar, which calls it - Lua locals are lexically scoped.
+-- Interrupted-cast shake: Blizzard's exact InterruptShakeAnim recipe
+-- (CastingBarFrame.xml on the forever branch) - a subtle 1-2px diagonal
+-- jitter, ~0.3 s total: a 0.1 s hold, then four instantaneous translations
+-- 0.05 s apart. Defined before CreateBar, which calls it - Lua locals are
+-- lexically scoped.
 local function CreateShakeAnimation(bar)
 	local group = bar:CreateAnimationGroup()
-	-- Decaying amplitude: strongest jolt first, easing to rest, ~0.7 s total.
-	local offsets = { -6, 6, -5, 5, -4, 4, -3, 3, -2, 2, -1.5, 1.5, -1, 1, -0.5, 0.5, 0 }
+	local offsets = {
+		{ 0, 0, 0.1, 0 },
+		{ -1, 1, 0.0, 0.05 },
+		{ 1, -2, 0.0, 0.05 },
+		{ 1, 2, 0.0, 0.05 },
+		{ -1, -1, 0.0, 0.05 },
+	}
 	for i = 1, #offsets do
 		local anim = group:CreateAnimation("Translation")
-		anim:SetOffset(offsets[i], 0)
-		anim:SetDuration(SHAKE_STEP)
+		anim:SetOffset(offsets[i][1], offsets[i][2])
+		anim:SetDuration(offsets[i][3])
+		anim:SetStartDelay(offsets[i][4])
 		anim:SetOrder(i)
 	end
 	return group
@@ -310,6 +320,12 @@ function Bars:FadeFillBack(bar, tint, gen)
 	for step = 1, TINT_STEPS do
 		C_Timer.NewTimer(step * stepDuration, function()
 			if (bar.tintGen or 0) ~= gen then
+				return
+			end
+			if step == TINT_STEPS then
+				-- Fade complete: restore the whole base appearance, including
+				-- the pip the interrupt swapped to the red cast-bar pip.
+				self:ApplyFillStyle(bar)
 				return
 			end
 			local t = step / TINT_STEPS
@@ -725,13 +741,21 @@ function Bars:SwingPaused(hand)
 	end
 end
 
--- The interrupted-cast treatment (red tint + shake), shared by the clip event
--- and in-flight stops.
+-- The interrupted-cast treatment (red tint + red pip + shake), shared by the
+-- clip event and in-flight stops.
 function Bars:InterruptFeedback(bar)
 	self:SetFillTint(bar, CLIP_TINT)
+	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas.
+	bar.pip:SetAtlas(CASTBAR_PIP_RED_ATLAS)
+	bar.pip:SetSize(8, 20)
 	if bar.shake then
-		bar.shake:Stop()
-		bar.shake:Play()
+		-- Blizzard gates the shake on the ShakeStrengthUI CVar; an absent CVar
+		-- (client without the setting) defaults to enabled.
+		local strength = tonumber(GetCVar("ShakeStrengthUI"))
+		if strength == nil or strength > 0 then
+			bar.shake:Stop()
+			bar.shake:Play()
+		end
 	end
 end
 

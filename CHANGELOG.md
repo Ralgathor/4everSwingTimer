@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   queued. Polled every 0.2 s via C_Spell.IsCurrentSpell (probe-verified on
   the beta: plain booleans, true with Heroic Strike queued). On by default,
   with a settings toggle.
+- Interrupt fidelity with the cast bar, from the forever-branch source: the
+  shake now replicates Blizzard's exact InterruptShakeAnim (a subtle 1-2 px
+  diagonal jitter, ~0.3 s, gated on the ShakeStrengthUI CVar, enabled by
+  default when the CVar is absent), replacing the previous 0.7 s decaying
+  6 px shake, and the tick swaps to the cast bar's interrupted spark atlas
+  (ui-castingbar-pip-red) for the duration of the interrupt tint, restoring
+  with the fade.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned
