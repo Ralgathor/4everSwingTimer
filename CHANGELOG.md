@@ -32,3 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   swing is still in flight, on an in-flight STOP, and on
   UNIT_SWING_TIMER_CLIPPED itself - covering cast resets, weapon swaps, death
   and the mid-cast clip.
+- Parry-haste feedback: an early landing - an in-flight STOP followed by a
+  START with the same weapon speed, the signature of the engine shortening
+  the swing mid-flight (player parry; a mid-swing haste proc reads the
+  same) - bounces the bar vertically with a green tint, distinct from the
+  interrupt treatment. In-flight stops are classified after a short grace
+  period: START with the same speed is an early landing, START with a new
+  speed is a weapon swap, and no START at all (death, attack stopped) keeps
+  the interrupted treatment.

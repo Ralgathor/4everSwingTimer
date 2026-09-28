@@ -10,6 +10,7 @@ That means the bars also show what happens *between* swings:
 
 - cast-completion swing resets (the bar turns red and shakes, like the
   game's interrupted cast bar, then restarts),
+- parry-hasted early landings (the bar bounces green),
 - paused swings (desaturated, dimmed),
 - clipped swings,
 - movement-cancelled Auto Shot reschedules,
@@ -53,10 +54,13 @@ You will get a one-time chat hint about this if the native bars are on.
 
 ## FAQ
 
-**The bar finished early after I parried an attack.** Correct-ish: on WoW:
-Forever no addon-facing API exists for parry haste mid-swing (a request is filed
-with Blizzard), so the library reflects a hastened swing at the next swing
-anchor. The bar can overshoot by up to one swing and then self-corrects.
+**The bar finished early after I parried an attack.** That is the parry-haste
+feedback: the engine shortened your swing mid-flight (no addon-facing parry API
+exists on WoW: Forever; a request is filed with Blizzard), the swing landed
+early and the bar bounced green at the re-anchor. Before that bounce the bar
+still showed the un-hasted time - the addon cannot see the parry itself, only
+the early landing, which is why the signal arrives when the swing lands. A
+mid-swing haste proc produces the same bounce.
 
 **I changed weapons and the current bar kept the old speed.** On WoW: Forever
 the engine applies new weapon speeds at the next swing, so an in-flight swing is

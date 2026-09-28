@@ -63,6 +63,13 @@ local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
 local SHAKE_STEP = 0.04
+-- Early-landing (parry haste) feedback: green tint plus a vertical bounce,
+-- contrasting with the interrupt's red horizontal shake. A STOP is followed
+-- by its START within one library call, so the stop cannot be classified
+-- until a short grace period shows whether a START follows and with which
+-- weapon speed.
+local HASTE_TINT = { 0.35, 1.00, 0.45 }
+local STOP_GRACE = 0.10
 
 local Bars = {}
 Addon.Bars = Bars
@@ -144,6 +151,20 @@ local function CreateShakeAnimation(bar)
 	return group
 end
 
+-- Early-landing feedback: a quick vertical bounce (the interrupt shake is
+-- horizontal, so the two read differently at a glance).
+local function CreateBounceAnimation(bar)
+	local group = bar:CreateAnimationGroup()
+	local offsets = { 3, -3, 2.5, -2.5, 2, -2, 1.5, -1.5, 1, -1, 0.5, -0.5, 0 }
+	for i = 1, #offsets do
+		local anim = group:CreateAnimation("Translation")
+		anim:SetOffset(0, offsets[i])
+		anim:SetDuration(0.025)
+		anim:SetOrder(i)
+	end
+	return group
+end
+
 local function CreateBar(hand)
 	local bar = CreateFrame("Frame", "FourEverSwingTimerBar" .. hand, anchor)
 	bar.hand = hand
@@ -182,6 +203,8 @@ local function CreateBar(hand)
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
 	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
 	bar.shake = CreateShakeAnimation(bar)
+	-- Early-landing (parry haste) bounce.
+	bar.bounce = CreateBounceAnimation(bar)
 
 	bar.active = false
 	bar.paused = false
@@ -471,18 +494,40 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 	if not bar then
 		return
 	end
-	-- A START (not an UPDATE) while a swing is still in flight is the
-	-- cast-completion swing reset: the library restarts the swing with
-	-- isReset=true, which SUPPRESSES the STOP event (Unit:SwingStart), so no
-	-- stop and no CLIPPED ever reaches the addon on that path. Detecting the
-	-- reset here is the only addon-side signal for the common case.
-	if not isUpdate and bar.active and bar.expiration and bar.expiration > GetTime() + 0.05 then
-		self:InterruptFeedback(bar)
-	end
-	-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
-	-- Auto Shot reschedule: the engine pushed the shot back. Show the delay.
-	if isUpdate and hand == "ranged" and bar.active
+	if not isUpdate then
+		local now = GetTime()
+		if bar.active and bar.expiration and bar.expiration > now + 0.05 then
+			-- A START while a swing is still in flight is the cast-completion
+			-- swing reset: the library restarts the swing with isReset=true,
+			-- which SUPPRESSES the STOP event (Unit:SwingStart), so no stop and
+			-- no CLIPPED ever reaches the addon on that path.
+			self:InterruptFeedback(bar)
+		elseif bar.stoppedInFlight and now - (bar.stoppedAt or 0) <= STOP_GRACE + 0.05 then
+			-- A START right after an in-flight stop: classify by weapon speed.
+			bar.stoppedInFlight = nil
+			local speedAtStop = bar.speedAtStop
+			local sameSpeed = speedAtStop and speed and math.abs(speed - speedAtStop) <= math.max(speedAtStop * 0.02, 0.01)
+			if sameSpeed then
+				-- Early landing with the same weapon: the engine shortened the
+				-- swing mid-flight. On WoW: Forever that is parry haste (no
+				-- addon-facing parry API exists; the library re-anchors and the
+				-- hastened swing simply lands early - a mid-swing haste proc
+				-- produces the same signature).
+				self:SetFillTint(bar, HASTE_TINT)
+				if bar.bounce then
+					bar.bounce:Stop()
+					bar.bounce:Play()
+				end
+			else
+				-- Different weapon speed: a weapon swap restart; the old swing
+				-- was cut short.
+				self:InterruptFeedback(bar)
+			end
+		end
+	elseif hand == "ranged" and bar.active
 		and expirationTime > (bar.expiration or 0) + 0.05 then
+		-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
+		-- Auto Shot reschedule: the engine pushed the shot back. Show the delay.
 		self:SetFillTint(bar, DELAY_TINT)
 	end
 	bar.speed = speed
@@ -497,14 +542,19 @@ function Bars:SwingStop(hand)
 	if not bar then
 		return
 	end
-	-- A stop while the swing is still in flight means the swing was cut short.
-	-- On WoW: Forever the library fires in-flight stops on death, weapon swaps
-	-- and early (parry-hasted) landings - the cast-completion reset does NOT
-	-- stop (its STOP is suppressed for resets; see SwingStart). Any in-flight
-	-- stop gets the interrupted-cast treatment.
-	if bar.active and bar.expiration and bar.expiration > GetTime() + 0.05 then
-		self:InterruptFeedback(bar)
-	end
+	-- A stop while the swing is still in flight means the swing was cut short
+	-- or landed early; WHICH of the two is only knowable after a short grace
+	-- period, because the library fires a restart as STOP+START inside one
+	-- call. Record the facts and let the grace timer (or the START that beats
+	-- it) decide the feedback.
+	bar.stoppedInFlight = (bar.active and bar.expiration and bar.expiration > GetTime() + 0.05) or nil
+	bar.stoppedAt = GetTime()
+	bar.speedAtStop = bar.speed
+	bar.stopGen = (bar.stopGen or 0) + 1
+	local gen = bar.stopGen
+	C_Timer.NewTimer(STOP_GRACE, function()
+		Bars:FinishStopFeedback(bar, gen)
+	end)
 	bar.active = false
 	bar.expiration = nil
 	self:SetPaused(bar, false)
@@ -512,6 +562,17 @@ function Bars:SwingStop(hand)
 	self:SetParkedText(bar)
 	bar.delta:SetText("")
 	self:UpdateVisibility()
+end
+
+-- Fires STOP_GRACE seconds after an in-flight stop, unless a START already
+-- classified it: nothing followed, so the swing was simply cut short (death,
+-- auto-attack stopped, unequipped mid-combat).
+function Bars:FinishStopFeedback(bar, gen)
+	if (bar.stopGen or 0) ~= gen or not bar.stoppedInFlight then
+		return
+	end
+	bar.stoppedInFlight = nil
+	self:InterruptFeedback(bar)
 end
 
 function Bars:SwingPaused(hand)
