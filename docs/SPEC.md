@@ -310,7 +310,7 @@ Design borrowings for the addon:
 - **Visibility model = the native three modes** (section 4.2, amended).
 - Optional **out-of-range dimming** as a v1.1 candidate: mirror the native
   approach (query on `PLAYER_TARGET_CHANGED`, `EnableRangeCheck`), beta-flagged
-  since the event is broken; degrade to query-only.
+  since the event is broken; degrade to query-only. Probe 2026-09-28: the query returns nil with a target in melee range and out of range after EnableRangeCheck - blocked upstream entirely, event and query both dead on this beta build; revisit with the Blizzard report.
 - Fill direction stays configurable: default **drain** (classic addon
   convention, what the target audience is used to), with the native-style skin
   defaulting to fill-up to match the client's look.
