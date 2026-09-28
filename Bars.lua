@@ -200,6 +200,30 @@ function Bars:ApplySkin()
 	end
 end
 
+-- Parked ("swing ready") text: with the speed option on, the time label keeps
+-- showing the weapon speed; the remaining-time readout is 0.0. The speed comes
+-- from the last swing's event payload (the addon never reads weapon-speed APIs
+-- directly), so before the very first swing it is unknown and only the time
+-- readout is shown.
+function Bars:SetParkedText(bar)
+	local db = Addon.db
+	if db.showSpeed then
+		if bar.speed then
+			if db.showTime then
+				bar.time:SetText(format("0.0 / %.2f", bar.speed))
+			else
+				bar.time:SetText(format("%.2f", bar.speed))
+			end
+		elseif db.showTime then
+			bar.time:SetText("0.0")
+		else
+			bar.time:SetText("")
+		end
+	elseif db.showTime then
+		bar.time:SetText("0.0")
+	end
+end
+
 function Bars:ApplyText()
 	local db = Addon.db
 	for i = 1, #HAND_ORDER do
@@ -208,6 +232,9 @@ function Bars:ApplyText()
 		bar.label:SetShown(db.showLabel)
 		bar.time:SetShown(db.showTime or db.showSpeed)
 		bar.delta:SetShown(db.showDelta and hand == "offhand")
+		if not bar.active then
+			self:SetParkedText(bar)
+		end
 	end
 end
 
@@ -357,11 +384,10 @@ function Bars:SwingStop(hand)
 		return
 	end
 	bar.active = false
-	bar.speed = nil
 	bar.expiration = nil
 	self:SetPaused(bar, false)
 	bar.status:SetValue(ParkedValue())
-	bar.time:SetText("0.0")
+	self:SetParkedText(bar)
 	bar.delta:SetText("")
 	self:UpdateVisibility()
 end
