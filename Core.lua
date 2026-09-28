@@ -74,6 +74,7 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 
 frame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
@@ -92,6 +93,12 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		Addon.inCombat = false
+		if Addon.Bars then
+			Addon.Bars:UpdateVisibility()
+		end
+	elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+		-- Equipping a shield in the off hand (or swapping weapons) changes
+		-- whether a hand can swing; refresh bar visibility immediately.
 		if Addon.Bars then
 			Addon.Bars:UpdateVisibility()
 		end

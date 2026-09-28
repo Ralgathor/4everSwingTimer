@@ -9,6 +9,10 @@ local Addon = FourEverSwingTimer
 local format = format
 local GetTime = GetTime
 local GetInventoryItemID = GetInventoryItemID
+local GetItemInfo = GetItemInfo
+-- Localized item-class name for "Weapon" (GetItemInfo returns localized class
+-- strings; comparing against the literal "Weapon" breaks on non-English clients).
+local WEAPON_CLASS = (GetItemClassInfo and Enum and Enum.ItemClass and GetItemClassInfo(Enum.ItemClass.Weapon)) or "Weapon"
 
 local HAND_ORDER = { "mainhand", "offhand", "ranged" }
 local INVENTORY_SLOT = { mainhand = 16, offhand = 17, ranged = 18 }
@@ -256,7 +260,17 @@ function Bars:RestorePosition()
 end
 
 function Bars:HasWeapon(hand)
-	return GetInventoryItemID("player", INVENTORY_SLOT[hand]) ~= nil
+	local itemID = GetInventoryItemID("player", INVENTORY_SLOT[hand])
+	if not itemID then
+		return false
+	end
+	if hand == "offhand" then
+		-- Shields and holds sit in the off-hand slot but never swing; only a
+		-- real weapon there drives an off-hand swing timer.
+		local itemClass = select(6, GetItemInfo(itemID))
+		return itemClass == WEAPON_CLASS
+	end
+	return true
 end
 
 function Bars:Relayout(visible)
