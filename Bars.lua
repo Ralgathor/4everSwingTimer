@@ -85,7 +85,10 @@ local STOP_GRACE = 0.10
 -- Heroic Strike queued. The fill swaps to the plain texture while queued
 -- because a vertex tint would modulate the native atlas fill's own colors.
 local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor Strike, Maul
-local QUEUED_COLOR = { 0.40, 0.90, 1.00 }
+-- The cast bar's fill look: light-to-deep yellow gradient, with the spark's
+-- warm yellow on the pip glow.
+local QUEUED_GRADIENT = { { 1.00, 0.97, 0.62 }, { 1.00, 0.73, 0.12 } }
+local QUEUED_SPARK = { 1.00, 0.90, 0.35 }
 local QUEUE_POLL = 0.20
 
 local Bars = {}
@@ -209,11 +212,11 @@ local function CreateBar(hand)
 	-- Queued-state glow on the pip, like the casting bar's spark: a soft
 	-- two-layer additive halo anchored to the tick, tracking the fill edge.
 	bar.queuedGlow = CreateFrame("Frame", nil, bar.status)
-	bar.queuedGlow:SetSize(18, 18)
+	bar.queuedGlow:SetSize(22, 12)
 	bar.queuedGlow:SetPoint("CENTER", bar.pip, "CENTER")
 	local glowOuter = bar.queuedGlow:CreateTexture(nil, "OVERLAY")
 	glowOuter:SetAllPoints(bar.queuedGlow)
-	glowOuter:SetColorTexture(QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3])
+	glowOuter:SetColorTexture(QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3])
 	glowOuter:SetAlpha(0.25)
 	glowOuter:SetBlendMode("ADD")
 	local glowInner = bar.queuedGlow:CreateTexture(nil, "OVERLAY")
@@ -334,25 +337,45 @@ function Bars:SetPaused(bar, paused)
 	bar.time:SetVertexColor(paused and 0.6 or 1.0, paused and 0.6 or 1.0, paused and 0.6 or 1.0)
 end
 
--- The fill appearance: the queued state overrides the skin (queue color on
--- the plain fill texture, pip shown and glowing); otherwise the skin's own
--- fill and pip. Flash tints layer on top of this base.
+-- The fill appearance: the queued state overrides the skin (the cast bar's
+-- light-to-deep yellow gradient on the plain fill texture, pip shown with a
+-- warm spark glow); otherwise the skin's own fill and pip. Flash tints layer
+-- on top of this base as vertex color over the gradient.
 function Bars:ApplyFillStyle(bar)
 	local db = Addon.db
 	local queued = db.highlightQueued and bar.queued
 	if queued then
 		bar.status:SetStatusBarTexture(FLAT_TEXTURE)
+	elseif db.skin == "native" then
+		bar.status:SetStatusBarTexture(FILL_ATLAS[bar.hand])
 	else
-		if db.skin == "native" then
-			bar.status:SetStatusBarTexture(FILL_ATLAS[bar.hand])
-		else
-			bar.status:SetStatusBarTexture(FLAT_TEXTURE)
-		end
+		bar.status:SetStatusBarTexture(FLAT_TEXTURE)
 	end
 	local texture = bar.status:GetStatusBarTexture()
 	if texture then
+		-- Neutralize any gradient from a previous queued state first, so an
+		-- unqueued fill is exactly the skin's own look (the statusbar may
+		-- reuse its fill texture object).
+		local canGradient = texture.SetGradient ~= nil and CreateColor ~= nil
+		local cleared = true
+		if canGradient then
+			cleared = pcall(texture.SetGradient, texture, "HORIZONTAL", CreateColor(1, 1, 1, 1), CreateColor(1, 1, 1, 1))
+		end
 		if queued then
-			texture:SetVertexColor(QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3])
+			local applied = false
+			if cleared and canGradient then
+				applied = pcall(texture.SetGradient, texture, "HORIZONTAL",
+					CreateColor(QUEUED_GRADIENT[1][1], QUEUED_GRADIENT[1][2], QUEUED_GRADIENT[1][3], 1),
+					CreateColor(QUEUED_GRADIENT[2][1], QUEUED_GRADIENT[2][2], QUEUED_GRADIENT[2][3], 1))
+			end
+			bar.queuedGradient = applied or nil
+			if applied then
+				-- The gradient carries the color; the vertex stays neutral so
+				-- flash tints modulate it and fade back cleanly.
+				texture:SetVertexColor(1, 1, 1)
+			else
+				texture:SetVertexColor(QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3])
+			end
 		elseif db.skin == "native" then
 			texture:SetVertexColor(1, 1, 1)
 		else
@@ -363,7 +386,7 @@ function Bars:ApplyFillStyle(bar)
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 	if queued then
 		bar.pip:Show()
-		bar.pip:SetVertexColor(QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3])
+		bar.pip:SetVertexColor(QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3])
 		bar.queuedGlow:Show()
 	else
 		bar.pip:SetVertexColor(1, 1, 1)
@@ -380,7 +403,11 @@ end
 function Bars:GetBaseFillColor(bar)
 	local db = Addon.db
 	if db.highlightQueued and bar.queued then
-		return QUEUED_COLOR[1], QUEUED_COLOR[2], QUEUED_COLOR[3]
+		if bar.queuedGradient then
+			-- The gradient carries the queued color; the vertex fades to neutral.
+			return 1, 1, 1
+		end
+		return QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3]
 	end
 	if db.skin == "native" then
 		return 1, 1, 1

@@ -44,10 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stopped) keeps the interrupted treatment.
 - Queued next-melee highlight: while a next-melee ability (Heroic Strike,
   Cleave, Raptor Strike, Maul - base spell IDs) is queued, the main-hand
-  fill takes the queue color (the plain fill texture - a vertex tint over
-  the native atlas would modulate its own colors) and the pip - the tick
-  riding the fill edge - carries a two-layer additive glow, matching the
-  casting bar's lit fill and spark treatment. Polled every 0.2 s via
+  fill mirrors the casting bar's look - a light-to-deep yellow gradient
+  (Texture:SetGradient, 10.0+ API, flat-color fallback) on the plain fill
+  texture, with a warm spark glow on the pip riding the fill edge.
+  A vertex tint over the native atlas would modulate its own colors, hence
+  the texture swap while queued. Polled every 0.2 s via
   C_Spell.IsCurrentSpell (probe-verified on the beta: plain booleans, true
   with Heroic Strike queued). On by default, with a settings toggle.
 - Fixed bars staying hidden in the Always visibility mode after entering the
