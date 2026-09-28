@@ -157,6 +157,12 @@ end
 -- Visual state
 -- ---------------------------------------------------------------------------
 
+-- A parked bar (no active swing) sits at "ready": full in fill mode,
+-- empty in drain mode.
+local function ParkedValue()
+	return Addon.db.fill == "fill" and 1 or 0
+end
+
 function Bars:SetPaused(bar, paused)
 	bar.paused = paused
 	local texture = bar.status:GetStatusBarTexture()
@@ -350,7 +356,7 @@ function Bars:SwingStop(hand)
 	bar.speed = nil
 	bar.expiration = nil
 	self:SetPaused(bar, false)
-	bar.status:SetValue(0)
+	bar.status:SetValue(ParkedValue())
 	bar.time:SetText("0.0")
 	bar.delta:SetText("")
 	self:UpdateVisibility()
@@ -434,6 +440,14 @@ function Bars:ApplyAll()
 	self:ApplyText()
 	self:SetLocked(Addon.db.locked)
 	self:ApplyLayout()
+	-- Re-park inactive bars so a fill/drain switch is reflected immediately.
+	local parked = ParkedValue()
+	for i = 1, #HAND_ORDER do
+		local bar = self.bars[HAND_ORDER[i]]
+		if not bar.active then
+			bar.status:SetValue(parked)
+		end
+	end
 end
 
 function Bars:Enable(lib)

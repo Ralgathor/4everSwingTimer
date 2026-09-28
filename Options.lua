@@ -105,7 +105,7 @@ function Options:Init()
 	local fill, fillOptions = ProxyString("fill", "Bar direction", db.fill, {
 		{ value = "drain", label = "Drain (full to empty)" },
 		{ value = "fill",  label = "Fill (empty to full)" },
-	}, nil)
+	}, ApplyAll)
 	Settings.CreateDropdown(category, fill, fillOptions,
 		"Drain matches classic swing timer addons; Fill matches the game's own bar.")
 
