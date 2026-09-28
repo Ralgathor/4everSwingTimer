@@ -43,14 +43,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a new speed is a weapon swap, and no START at all (death, attack
   stopped) keeps the interrupted treatment.
 - Queued next-melee highlight: while a next-melee ability (Heroic Strike,
-  Cleave, Raptor Strike, Maul - base spell IDs) is queued, the main-hand
-  fill mirrors the casting bar's look - a light-to-deep yellow gradient
-  (Texture:SetGradient, 10.0+ API, flat-color fallback) on the plain fill
-  texture, with a warm spark glow on the pip riding the fill edge.
-  A vertex tint over the native atlas would modulate its own colors, hence
-  the texture swap while queued. Polled every 0.2 s via
-  C_Spell.IsCurrentSpell (probe-verified on the beta: plain booleans, true
-  with Heroic Strike queued). On by default, with a settings toggle.
+  Cleave, Raptor Strike, Maul - base spell IDs) is queued, the main-hand bar
+  uses the cast bar's own assets, verified in Blizzard_UIPanels_Game on the
+  forever branch: the ui-castingbar-filling-standard fill atlas (the yellow
+  gradient is baked into the atlas), the ui-castingbar-pip tick and the
+  cast_standard_pipglow streak in ADD blend behind it, exactly the
+  StandardGlow anchor (+2px to the pip's left). A vertex tint over the native
+  swing atlas would modulate its own colors, hence the texture swap while
+  queued. Polled every 0.2 s via C_Spell.IsCurrentSpell (probe-verified on
+  the beta: plain booleans, true with Heroic Strike queued). On by default,
+  with a settings toggle.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned

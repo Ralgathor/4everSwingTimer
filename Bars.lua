@@ -85,10 +85,13 @@ local STOP_GRACE = 0.10
 -- Heroic Strike queued. The fill swaps to the plain texture while queued
 -- because a vertex tint would modulate the native atlas fill's own colors.
 local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor Strike, Maul
--- The cast bar's fill look: light-to-deep yellow gradient, with the spark's
--- warm yellow on the pip glow.
-local QUEUED_GRADIENT = { { 1.00, 0.97, 0.62 }, { 1.00, 0.73, 0.12 } }
-local QUEUED_SPARK = { 1.00, 0.90, 0.35 }
+-- The cast bar's own assets (verified in Blizzard_UIPanels_Game on the
+-- forever branch): the fill gradient is baked into the ui-castingbar-filling-
+-- standard atlas, the tick is ui-castingbar-pip, and the glow behind the tick
+-- is cast_standard_pipglow in ADD blend - a streak anchored to the pip's left.
+local CASTBAR_FILL_ATLAS = "ui-castingbar-filling-standard"
+local CASTBAR_PIP_ATLAS = "ui-castingbar-pip"
+local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
 local QUEUE_POLL = 0.20
 
 local Bars = {}
@@ -209,22 +212,14 @@ local function CreateBar(hand)
 	bar.pip:SetAtlas(PIP_ATLAS, true)
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 
-	-- Queued-state glow on the pip, like the casting bar's spark: a soft
-	-- two-layer additive halo anchored to the tick, tracking the fill edge.
-	bar.queuedGlow = CreateFrame("Frame", nil, bar.status)
-	bar.queuedGlow:SetSize(22, 12)
-	bar.queuedGlow:SetPoint("CENTER", bar.pip, "CENTER")
-	local glowOuter = bar.queuedGlow:CreateTexture(nil, "OVERLAY")
-	glowOuter:SetAllPoints(bar.queuedGlow)
-	glowOuter:SetColorTexture(QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3])
-	glowOuter:SetAlpha(0.25)
-	glowOuter:SetBlendMode("ADD")
-	local glowInner = bar.queuedGlow:CreateTexture(nil, "OVERLAY")
-	glowInner:SetSize(6, 6)
-	glowInner:SetPoint("CENTER", bar.queuedGlow, "CENTER")
-	glowInner:SetColorTexture(1, 1, 1)
-	glowInner:SetAlpha(0.45)
-	glowInner:SetBlendMode("ADD")
+	-- Queued-state spark glow, exactly the cast bar's StandardGlow: the
+	-- cast_standard_pipglow atlas in ADD blend, a streak to the left of the
+	-- pip (its RIGHT edge anchors to the pip's LEFT, +2px like the XML).
+	bar.queuedGlow = bar.status:CreateTexture(nil, "OVERLAY")
+	bar.queuedGlow:SetAtlas(CASTBAR_PIP_GLOW_ATLAS)
+	bar.queuedGlow:SetBlendMode("ADD")
+	bar.queuedGlow:SetSize(37, 12)
+	bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
 	bar.queuedGlow:Hide()
 
 	-- Text lives on the StatusBar, not the bar frame: the StatusBar is
@@ -337,15 +332,16 @@ function Bars:SetPaused(bar, paused)
 	bar.time:SetVertexColor(paused and 0.6 or 1.0, paused and 0.6 or 1.0, paused and 0.6 or 1.0)
 end
 
--- The fill appearance: the queued state overrides the skin (the cast bar's
--- light-to-deep yellow gradient on the plain fill texture, pip shown with a
--- warm spark glow); otherwise the skin's own fill and pip. Flash tints layer
--- on top of this base as vertex color over the gradient.
+-- The fill appearance: the queued state overrides the skin with the cast
+-- bar's own look - the ui-castingbar-filling-standard atlas (the yellow
+-- gradient is baked into the atlas; vertex color stays neutral) and the cast
+-- bar's pip with its glow streak; otherwise the skin's own fill and pip.
+-- Flash tints layer on top of this base as vertex color.
 function Bars:ApplyFillStyle(bar)
 	local db = Addon.db
 	local queued = db.highlightQueued and bar.queued
 	if queued then
-		bar.status:SetStatusBarTexture(FLAT_TEXTURE)
+		bar.status:SetStatusBarTexture(CASTBAR_FILL_ATLAS)
 	elseif db.skin == "native" then
 		bar.status:SetStatusBarTexture(FILL_ATLAS[bar.hand])
 	else
@@ -353,30 +349,7 @@ function Bars:ApplyFillStyle(bar)
 	end
 	local texture = bar.status:GetStatusBarTexture()
 	if texture then
-		-- Neutralize any gradient from a previous queued state first, so an
-		-- unqueued fill is exactly the skin's own look (the statusbar may
-		-- reuse its fill texture object).
-		local canGradient = texture.SetGradient ~= nil and CreateColor ~= nil
-		local cleared = true
-		if canGradient then
-			cleared = pcall(texture.SetGradient, texture, "HORIZONTAL", CreateColor(1, 1, 1, 1), CreateColor(1, 1, 1, 1))
-		end
-		if queued then
-			local applied = false
-			if cleared and canGradient then
-				applied = pcall(texture.SetGradient, texture, "HORIZONTAL",
-					CreateColor(QUEUED_GRADIENT[1][1], QUEUED_GRADIENT[1][2], QUEUED_GRADIENT[1][3], 1),
-					CreateColor(QUEUED_GRADIENT[2][1], QUEUED_GRADIENT[2][2], QUEUED_GRADIENT[2][3], 1))
-			end
-			bar.queuedGradient = applied or nil
-			if applied then
-				-- The gradient carries the color; the vertex stays neutral so
-				-- flash tints modulate it and fade back cleanly.
-				texture:SetVertexColor(1, 1, 1)
-			else
-				texture:SetVertexColor(QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3])
-			end
-		elseif db.skin == "native" then
+		if queued or db.skin == "native" then
 			texture:SetVertexColor(1, 1, 1)
 		else
 			local color = FLAT_COLORS[bar.hand]
@@ -385,10 +358,14 @@ function Bars:ApplyFillStyle(bar)
 	end
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 	if queued then
+		-- The cast bar's pip: ui-castingbar-pip, 8x20 (CastingBarFrame.xml).
+		bar.pip:SetAtlas(CASTBAR_PIP_ATLAS)
+		bar.pip:SetSize(8, 20)
+		bar.pip:SetVertexColor(1, 1, 1)
 		bar.pip:Show()
-		bar.pip:SetVertexColor(QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3])
 		bar.queuedGlow:Show()
 	else
+		bar.pip:SetAtlas(PIP_ATLAS, true)
 		bar.pip:SetVertexColor(1, 1, 1)
 		bar.queuedGlow:Hide()
 		if db.skin == "native" then
@@ -403,11 +380,8 @@ end
 function Bars:GetBaseFillColor(bar)
 	local db = Addon.db
 	if db.highlightQueued and bar.queued then
-		if bar.queuedGradient then
-			-- The gradient carries the queued color; the vertex fades to neutral.
-			return 1, 1, 1
-		end
-		return QUEUED_SPARK[1], QUEUED_SPARK[2], QUEUED_SPARK[3]
+		-- The cast bar atlas carries the queued color; the vertex fades to neutral.
+		return 1, 1, 1
 	end
 	if db.skin == "native" then
 		return 1, 1, 1

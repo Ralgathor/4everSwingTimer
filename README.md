@@ -12,8 +12,8 @@ That means the bars also show what happens *between* swings:
   game's interrupted cast bar, then restarts),
 - parry-hasted early landings (the bar pops with a green glow),
 - queued next-melee abilities (Heroic Strike, Cleave, Raptor Strike, Maul) -
-  the main-hand bar fills with the cast bar's yellow gradient and its tick
-  glows like the cast bar's spark while one is queued,
+  the main-hand bar switches to the cast bar's own fill and spark art while
+  one is queued,
 - paused swings (desaturated, dimmed),
 - clipped swings,
 - movement-cancelled Auto Shot reschedules,
