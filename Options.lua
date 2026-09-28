@@ -141,6 +141,10 @@ function Options:Init()
 	local scale = ProxyNumber("scale", "Scale", db.scale, 0.5, 2.0, 0.05, ApplyAll)
 	Settings.CreateSlider(category, scale, Settings.CreateSliderOptions(0.5, 2.0, 0.05), "Overall bar scale.")
 
+	local tickSize = ProxyNumber("tickSize", "Tick size", db.tickSize, 8, 24, 1, ApplyAll)
+	Settings.CreateSlider(category, tickSize, Settings.CreateSliderOptions(8, 24, 1),
+		"Height in pixels of the queued-attack and interrupt tick (the chevron riding the bar). The glow behind it scales with it.")
+
 	-- Text
 	Settings.CreateCheckbox(category,
 		ProxyBoolean(VAR_PREFIX .. "showTime", "Show remaining time", db.showTime,

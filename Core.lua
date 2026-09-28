@@ -33,6 +33,7 @@ local DEFAULTS = {
 	width = 260,
 	height = 18,
 	gap = 4,
+	tickSize = 14,
 	visibility = "combat", -- "swinging" | "combat" | "always"
 	skin = "native",       -- "native" | "flat"
 	fill = "drain",        -- "drain" | "fill"

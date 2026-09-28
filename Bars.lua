@@ -103,22 +103,17 @@ local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
 -- the cast art scales to the STATUSBAR's height, not the frame's.
 local STATUS_INSET_X = 5
 local STATUS_INSET_Y = 4
--- Tick art sizing: the cast bar's own spark (8x20 on a 13px bar) overhangs
--- its bar, but that ratio reads too big on these bars (in-play feedback), so
--- the pip is sized to fit flush within the statusbar; the glow keeps the
--- cast bar's proportions relative to the pip (37x12 glow vs 8x20 pip).
+-- Tick art sizing: an explicit setting (db.tickSize, the pip height in
+-- pixels) - several in-play rounds could not converge on a fixed rule
+-- (flush read too small, overhang and linear scaling read too big), so the
+-- size is the user's call. The glow keeps the cast bar's proportions
+-- relative to the pip (37x12 glow vs 8x20 pip).
 local CASTBAR_PIP_RATIO_W = 8 / 20
 local CASTBAR_GLOW_RATIO_W = 37 / 20
 local CASTBAR_GLOW_RATIO_H = 12 / 20
 
--- Tick art sizing: flush within the statusbar, capped at an absolute maximum -
--- the cast bar's spark is 20px tall in absolute terms, and linear scaling at
--- large bar heights made the chevron enormous (in-play feedback).
-local CASTBAR_TICK_MAX = 16
-
 local function CastBarTickSize()
-	local tickHeight = math.min(Addon.db.height - STATUS_INSET_Y * 2, CASTBAR_TICK_MAX)
-	tickHeight = math.max(tickHeight, 4)
+	local tickHeight = math.max(Addon.db.tickSize or 14, 4)
 	return tickHeight * CASTBAR_PIP_RATIO_W, tickHeight,
 		tickHeight * CASTBAR_GLOW_RATIO_W, tickHeight * CASTBAR_GLOW_RATIO_H
 end
