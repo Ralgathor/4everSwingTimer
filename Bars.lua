@@ -92,7 +92,10 @@ local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor S
 -- forever branch): the fill gradient is baked into the ui-castingbar-filling-
 -- standard atlas, the tick is ui-castingbar-pip, and the glow behind the tick
 -- is cast_standard_pipglow in ADD blend - a streak anchored to the pip's left.
-local CASTBAR_FILL_ATLAS = "ui-castingbar-filling-standard"
+-- The queued fill keeps the swing bar's own art and takes the cast bar's
+-- classic yellow as a vertex tint (the cast bar's fill atlas swap was tested
+-- in play and rejected - the swing bar should keep its identity).
+local QUEUED_TINT = { 1.00, 0.82, 0.20 }
 local CASTBAR_PIP_ATLAS = "ui-castingbar-pip"
 local CASTBAR_PIP_RED_ATLAS = "ui-castingbar-pip-red"
 local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
@@ -361,24 +364,23 @@ function Bars:SetPaused(bar, paused)
 	bar.time:SetVertexColor(paused and 0.6 or 1.0, paused and 0.6 or 1.0, paused and 0.6 or 1.0)
 end
 
--- The fill appearance: the queued state overrides the skin with the cast
--- bar's own look - the ui-castingbar-filling-standard atlas (the yellow
--- gradient is baked into the atlas; vertex color stays neutral) and the cast
--- bar's pip with its glow streak; otherwise the skin's own fill and pip.
--- Flash tints layer on top of this base as vertex color.
+-- The fill appearance: the skin's own fill art always; the queued state is a
+-- color change (the cast bar's yellow), while the tick swaps to the cast
+-- bar's pip with its glow streak. Flash tints layer on top of this base as
+-- vertex color.
 function Bars:ApplyFillStyle(bar)
 	local db = Addon.db
 	local queued = db.highlightQueued and bar.queued
-	if queued then
-		bar.status:SetStatusBarTexture(CASTBAR_FILL_ATLAS)
-	elseif db.skin == "native" then
+	if db.skin == "native" then
 		bar.status:SetStatusBarTexture(FILL_ATLAS[bar.hand])
 	else
 		bar.status:SetStatusBarTexture(FLAT_TEXTURE)
 	end
 	local texture = bar.status:GetStatusBarTexture()
 	if texture then
-		if queued or db.skin == "native" then
+		if queued then
+			texture:SetVertexColor(QUEUED_TINT[1], QUEUED_TINT[2], QUEUED_TINT[3])
+		elseif db.skin == "native" then
 			texture:SetVertexColor(1, 1, 1)
 		else
 			local color = FLAT_COLORS[bar.hand]
@@ -411,8 +413,7 @@ end
 function Bars:GetBaseFillColor(bar)
 	local db = Addon.db
 	if db.highlightQueued and bar.queued then
-		-- The cast bar atlas carries the queued color; the vertex fades to neutral.
-		return 1, 1, 1
+		return QUEUED_TINT[1], QUEUED_TINT[2], QUEUED_TINT[3]
 	end
 	if db.skin == "native" then
 		return 1, 1, 1

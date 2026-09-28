@@ -43,16 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a new speed is a weapon swap, and no START at all (death, attack
   stopped) keeps the interrupted treatment.
 - Queued next-melee highlight: while a next-melee ability (Heroic Strike,
-  Cleave, Raptor Strike, Maul - base spell IDs) is queued, the main-hand bar
-  uses the cast bar's own assets, verified in Blizzard_UIPanels_Game on the
-  forever branch: the ui-castingbar-filling-standard fill atlas (the yellow
-  gradient is baked into the atlas), the ui-castingbar-pip tick and the
-  cast_standard_pipglow streak in ADD blend behind it, exactly the
-  StandardGlow anchor (+2px to the pip's left). A vertex tint over the native
-  swing atlas would modulate its own colors, hence the texture swap while
-  queued. Polled every 0.2 s via C_Spell.IsCurrentSpell (probe-verified on
-  the beta: plain booleans, true with Heroic Strike queued). On by default,
-  with a settings toggle.
+  Cleave, Raptor Strike, Maul - base spell IDs) is queued, the main-hand
+  fill takes the cast bar's classic yellow as a tint over the skin's own fill
+  art - the swing bar keeps its identity (the full cast-bar fill atlas swap
+  was tested in play and rejected) - and the tick swaps to the cast bar's
+  pip (ui-castingbar-pip) with its glow streak (cast_standard_pipglow, ADD
+  blend, anchored 2px to the pip's left), both working in the native and flat
+  bar styles. Polled every 0.2 s via C_Spell.IsCurrentSpell (probe-verified
+  on the beta: plain booleans, true with Heroic Strike queued). On by
+  default, with a settings toggle.
 - Interrupt fidelity with the cast bar, from the forever-branch source: the
   tick swaps to the cast bar's interrupted spark atlas (ui-castingbar-pip-red)
   for the duration of the interrupt tint, restoring with the fade, and the
