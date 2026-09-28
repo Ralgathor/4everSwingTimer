@@ -54,12 +54,15 @@ local LIB_EVENTS = {
 local TEST_SPEED = 2.0
 -- Interrupt feedback, modeled on the 12.x casting bar's interrupted treatment
 -- (InterruptShakeAnim + InterruptGlow): a clipped swing tints red and shakes;
--- a movement-delayed ranged swing tints amber. Tints decay back to the skin's
--- normal fill after TINT_TIME seconds.
+-- a movement-delayed ranged swing tints amber. The tint holds full for
+-- TINT_HOLD seconds, then fades back to the skin's normal fill over TINT_FADE
+-- seconds; the shake runs ~0.7 s with decaying amplitude.
 local CLIP_TINT = { 1.0, 0.25, 0.20 }
 local DELAY_TINT = { 1.0, 0.60, 0.10 }
-local TINT_TIME = 0.30
-local SHAKE_STEP = 0.03
+local TINT_HOLD = 0.45
+local TINT_FADE = 0.30
+local TINT_STEPS = 8
+local SHAKE_STEP = 0.04
 
 local Bars = {}
 Addon.Bars = Bars
@@ -130,7 +133,8 @@ end)
 -- CreateBar, which calls it - Lua locals are lexically scoped.
 local function CreateShakeAnimation(bar)
 	local group = bar:CreateAnimationGroup()
-	local offsets = { -5, 5, -4, 4, -3, 3, -2, 2, -1, 1, 0 }
+	-- Decaying amplitude: strongest jolt first, easing to rest, ~0.7 s total.
+	local offsets = { -6, 6, -5, 5, -4, 4, -3, 3, -2, 2, -1.5, 1.5, -1, 1, -0.5, 0.5, 0 }
 	for i = 1, #offsets do
 		local anim = group:CreateAnimation("Translation")
 		anim:SetOffset(offsets[i], 0)
@@ -197,35 +201,56 @@ local function ParkedValue()
 	return Addon.db.fill == "fill" and 1 or 0
 end
 
--- Temporarily tints the fill, then restores the skin's normal color. Works for
--- both skins: the atlas fill of the native skin and the colored plain fill of
--- the flat skin are both tinted via the statusbar texture's vertex color.
+local function Lerp(a, b, t)
+	return a + (b - a) * t
+end
+
+-- Temporarily tints the fill, holds it full for TINT_HOLD seconds, then fades
+-- back to the skin's normal color over TINT_FADE seconds in stepped lerps.
+-- Works for both skins: the atlas fill of the native skin and the colored
+-- plain fill of the flat skin are both tinted via the statusbar texture's
+-- vertex color. A generation counter invalidates scheduled steps when a new
+-- tint supersedes an unfinished one.
 function Bars:SetFillTint(bar, tint)
+	bar.tintGen = (bar.tintGen or 0) + 1
+	local gen = bar.tintGen
 	local texture = bar.status:GetStatusBarTexture()
 	if texture then
 		texture:SetVertexColor(tint[1], tint[2], tint[3])
 	end
-	if bar.tintTimer then
-		bar.tintTimer:Cancel()
-	end
-	bar.tintTimer = C_Timer.NewTimer(TINT_TIME, function()
-		Bars:RestoreFill(bar)
+	C_Timer.NewTimer(TINT_HOLD, function()
+		Bars:FadeFillBack(bar, tint, gen)
 	end)
 end
 
-function Bars:RestoreFill(bar)
-	if not bar then
+function Bars:FadeFillBack(bar, tint, gen)
+	if (bar.tintGen or 0) ~= gen then
 		return
 	end
 	local texture = bar.status:GetStatusBarTexture()
 	if not texture then
 		return
 	end
+	local targetR, targetG, targetB
 	if Addon.db.skin == "native" then
-		texture:SetVertexColor(1, 1, 1)
+		targetR, targetG, targetB = 1, 1, 1
 	else
 		local color = FLAT_COLORS[bar.hand]
-		bar.status:SetStatusBarColor(color[1], color[2], color[3])
+		targetR, targetG, targetB = color[1], color[2], color[3]
+	end
+	local stepDuration = TINT_FADE / TINT_STEPS
+	for step = 1, TINT_STEPS do
+		C_Timer.NewTimer(step * stepDuration, function()
+			if (bar.tintGen or 0) ~= gen then
+				return
+			end
+			local t = step / TINT_STEPS
+			texture:SetVertexColor(
+				Lerp(tint[1], targetR, t),
+				Lerp(tint[2], targetG, t),
+				Lerp(tint[3], targetB, t)
+			)
+		end)
 	end
 end
 
