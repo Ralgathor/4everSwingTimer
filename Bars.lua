@@ -129,18 +129,22 @@ local function CreateBar(hand)
 	bar.pip:SetAtlas(PIP_ATLAS, true)
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 
-	bar.label = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	bar.label:SetPoint("LEFT", bar, "LEFT", 10, 0)
+	-- Text and flash live on the StatusBar, not the bar frame: the StatusBar is
+	-- a child frame and child frames draw on top of all their parent's regions,
+	-- so parented text would be hidden behind the fill texture. (The native
+	-- Blizzard bar parents its labels to the StatusBar for the same reason.)
+	bar.label = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	bar.label:SetPoint("LEFT", bar.status, "LEFT", 5, 0)
 	bar.label:SetText(HAND_LABEL[hand])
 
-	bar.delta = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	bar.delta = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	bar.delta:SetPoint("LEFT", bar.label, "RIGHT", 8, 0)
 
-	bar.time = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	bar.time:SetPoint("RIGHT", bar, "RIGHT", -10, 0)
+	bar.time = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	bar.time:SetPoint("RIGHT", bar.status, "RIGHT", -5, 0)
 	bar.time:SetText("0.0")
 
-	bar.flash = bar:CreateTexture(nil, "OVERLAY")
+	bar.flash = bar.status:CreateTexture(nil, "OVERLAY")
 	bar.flash:SetAllPoints(bar)
 	bar.flash:SetColorTexture(1, 1, 1, 0.55)
 	bar.flash:Hide()
