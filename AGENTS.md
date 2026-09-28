@@ -40,6 +40,12 @@ Do not commit `Libs/` or `.release/` — generated and gitignored.
 - Declare every variable `local` — the WoW environment is shared.
 - WoW API calls in hot paths are localized into upvalues at the top of the
   file (`local GetTime = GetTime` etc.).
+- This client (mainline 12.x-era) has **removed many old global functions** —
+  `GetSpellCooldown`, `GetItemInfo`, `InterfaceOptions_AddCategory` among them.
+  Use the `C_*` namespaces (`C_Spell`, `C_Item`, the `Settings` system) with a
+  nil-guarded fallback to the old global, and verify the function exists before
+  caching it into an upvalue — a removed global upvalues to nil and only fails
+  at call time.
 - The addon name `4everSwingTimer` cannot be used as a Lua identifier; the
   cross-file namespace is the global `FourEverSwingTimer`.
 

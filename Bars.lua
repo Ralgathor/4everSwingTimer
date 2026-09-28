@@ -9,10 +9,15 @@ local Addon = FourEverSwingTimer
 local format = format
 local GetTime = GetTime
 local GetInventoryItemID = GetInventoryItemID
-local GetItemInfo = GetItemInfo
--- Localized item-class name for "Weapon" (GetItemInfo returns localized class
--- strings; comparing against the literal "Weapon" breaks on non-English clients).
+-- Mainline 12.x removed the GetItemInfo global (same namespace migration as
+-- GetSpellCooldown -> C_Spell on this client); use C_Item.GetItemInfo when
+-- present. The library does the same for the cooldown global.
+local GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+-- Off-hand weapon check, two layers: the localized item-class name when
+-- GetItemClassInfo exists, plus the locale-independent numeric item classID
+-- (Weapon = 2) from GetItemInfo's extended returns as a fallback.
 local WEAPON_CLASS = (GetItemClassInfo and Enum and Enum.ItemClass and GetItemClassInfo(Enum.ItemClass.Weapon)) or "Weapon"
+local WEAPON_CLASS_ID = (Enum and Enum.ItemClass and Enum.ItemClass.Weapon) or 2
 
 local HAND_ORDER = { "mainhand", "offhand", "ranged" }
 local INVENTORY_SLOT = { mainhand = 16, offhand = 17, ranged = 18 }
@@ -267,8 +272,11 @@ function Bars:HasWeapon(hand)
 	if hand == "offhand" then
 		-- Shields and holds sit in the off-hand slot but never swing; only a
 		-- real weapon there drives an off-hand swing timer.
-		local itemClass = select(6, GetItemInfo(itemID))
-		return itemClass == WEAPON_CLASS
+		local _, _, _, _, _, itemClass, _, _, _, _, _, classID = GetItemInfo(itemID)
+		if itemClass == nil and classID == nil then
+			return true -- item data not cached; do not hide the bar on missing data
+		end
+		return itemClass == WEAPON_CLASS or classID == WEAPON_CLASS_ID
 	end
 	return true
 end
