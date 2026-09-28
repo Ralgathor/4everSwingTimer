@@ -42,3 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grace period: START with the same speed is an early landing, START with
   a new speed is a weapon swap, and no START at all (death, attack
   stopped) keeps the interrupted treatment.
+- Fixed bars staying hidden in the Always visibility mode after entering the
+  world: the initial visibility pass runs at PLAYER_LOGIN, before the client
+  populates the player's inventory, so every weapon-presence read returned
+  nil. Visibility now refreshes on PLAYER_ENTERING_WORLD (login, teleport,
+  hearthstone), where the player's data is reliably present.

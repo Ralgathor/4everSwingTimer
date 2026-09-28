@@ -75,6 +75,7 @@ frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 frame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
@@ -93,6 +94,15 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 		end
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		Addon.inCombat = false
+		if Addon.Bars then
+			Addon.Bars:UpdateVisibility()
+		end
+	elseif event == "PLAYER_ENTERING_WORLD" then
+		-- The initial visibility pass runs at PLAYER_LOGIN, when the client has
+		-- often not populated the player's inventory yet - every HasWeapon read
+		-- returns nil and the Always visibility mode hides all bars until some
+		-- other event fires. Entering the world (login, teleport, hearthstone)
+		-- is the point where the player's data is reliably present, so refresh.
 		if Addon.Bars then
 			Addon.Bars:UpdateVisibility()
 		end
