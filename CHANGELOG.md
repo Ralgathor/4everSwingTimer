@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Interrupt feedback modeled on the 12.x casting bar: a clipped swing (reset
   by a cast) tints the fill red and shakes the bar for ~0.3 s; a
   movement-delayed ranged swing (Auto Shot pushed back by the engine) tints
-  the bar amber so the reschedule is visible. The red-and-shake treatment is
-  keyed to any stop that arrives while a swing is still in flight, because the
-  library fires the cast-completion swing reset as STOP+START - the
-  UNIT_SWING_TIMER_CLIPPED event only covers swings ending during a cast or
-  channel, which misses the common reset case.
+  the bar amber so the reschedule is visible. The reset detection keys on
+  library semantics verified in source: the cast-completion reset fires
+  START only (its STOP is suppressed by the isReset path in Unit:SwingStart),
+  so the feedback triggers on a START that arrives while a swing is still in
+  flight, on an in-flight STOP, and on UNIT_SWING_TIMER_CLIPPED itself -
+  covering cast resets, weapon swaps, death and the mid-cast clip.

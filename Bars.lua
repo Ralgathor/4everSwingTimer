@@ -446,6 +446,14 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 	if not bar then
 		return
 	end
+	-- A START (not an UPDATE) while a swing is still in flight is the
+	-- cast-completion swing reset: the library restarts the swing with
+	-- isReset=true, which SUPPRESSES the STOP event (Unit:SwingStart), so no
+	-- stop and no CLIPPED ever reaches the addon on that path. Detecting the
+	-- reset here is the only addon-side signal for the common case.
+	if not isUpdate and bar.active and bar.expiration and bar.expiration > GetTime() + 0.05 then
+		self:InterruptFeedback(bar)
+	end
 	-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
 	-- Auto Shot reschedule: the engine pushed the shot back. Show the delay.
 	if isUpdate and hand == "ranged" and bar.active
@@ -465,11 +473,10 @@ function Bars:SwingStop(hand)
 		return
 	end
 	-- A stop while the swing is still in flight means the swing was cut short.
-	-- On WoW: Forever the common case is the cast-completion swing reset: the
-	-- library fires STOP+START there, and UNIT_SWING_TIMER_CLIPPED only fires
-	-- when a swing ends DURING a cast or channel, so the clip event alone misses
-	-- the completion reset. Any in-flight stop gets the interrupted-cast
-	-- treatment; the START that follows repaints the bar with the new swing.
+	-- On WoW: Forever the library fires in-flight stops on death, weapon swaps
+	-- and early (parry-hasted) landings - the cast-completion reset does NOT
+	-- stop (its STOP is suppressed for resets; see SwingStart). Any in-flight
+	-- stop gets the interrupted-cast treatment.
 	if bar.active and bar.expiration and bar.expiration > GetTime() + 0.05 then
 		self:InterruptFeedback(bar)
 	end
