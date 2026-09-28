@@ -188,6 +188,8 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 		Addon:Print("Bars unlocked - drag them to move. Lock with |cffdddddd/4everswingtimer lock|r or in settings.")
 	elseif command == "test" then
 		Addon.Bars:Test()
+	elseif command == "debug" then
+		Addon.Bars:Debug()
 	elseif command == "reset" then
 		local defaults = Addon.DEFAULTS
 		Addon.db.point = defaults.point

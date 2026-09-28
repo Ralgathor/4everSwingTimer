@@ -886,6 +886,31 @@ function Bars:ApplyAll()
 	end
 end
 
+-- Diagnostic dump for the tick system: run /4everswingtimer debug while the
+-- symptom is on screen and read the actual runtime values.
+function Bars:Debug()
+	if not self.bars then
+		Addon:Print("Bars not enabled (library missing).")
+		return
+	end
+	local db = Addon.db
+	print("|cff33ccff" .. Addon.name .. "|r debug: fill=" .. db.fill .. " skin=" .. db.skin
+		.. " tickSize=" .. tostring(db.tickSize) .. " scale=" .. tostring(db.scale))
+	for i = 1, #HAND_ORDER do
+		local hand = HAND_ORDER[i]
+		local bar = self.bars[hand]
+		local value = bar.status:GetValue()
+		local statusWidth = bar.status:GetWidth()
+		local pipWidth = bar.pip:GetWidth()
+		local pipLeft = bar.pip:GetLeft() or -1
+		local statusLeft = bar.status:GetLeft() or -1
+		print(format("%s: active=%s value=%.3f statusW=%.1f pipW=%.1f pipShown=%s glowShown=%s queued=%s pipOffsetFromBar=%.1f",
+			hand, tostring(bar.active), value, statusWidth, pipWidth,
+			tostring(bar.pip:IsShown()), tostring(bar.queuedGlow:IsShown()), tostring(bar.queued),
+			pipLeft - statusLeft))
+	end
+end
+
 function Bars:Enable(lib)
 	if self.bars then
 		return
