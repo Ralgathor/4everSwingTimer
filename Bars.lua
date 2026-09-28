@@ -111,10 +111,16 @@ local CASTBAR_PIP_RATIO_W = 8 / 20
 local CASTBAR_GLOW_RATIO_W = 37 / 20
 local CASTBAR_GLOW_RATIO_H = 12 / 20
 
+-- Tick art sizing: flush within the statusbar, capped at an absolute maximum -
+-- the cast bar's spark is 20px tall in absolute terms, and linear scaling at
+-- large bar heights made the chevron enormous (in-play feedback).
+local CASTBAR_TICK_MAX = 16
+
 local function CastBarTickSize()
-	local statusHeight = math.max(Addon.db.height - STATUS_INSET_Y * 2, 4)
-	return statusHeight * CASTBAR_PIP_RATIO_W, statusHeight,
-		statusHeight * CASTBAR_GLOW_RATIO_W, statusHeight * CASTBAR_GLOW_RATIO_H
+	local tickHeight = math.min(Addon.db.height - STATUS_INSET_Y * 2, CASTBAR_TICK_MAX)
+	tickHeight = math.max(tickHeight, 4)
+	return tickHeight * CASTBAR_PIP_RATIO_W, tickHeight,
+		tickHeight * CASTBAR_GLOW_RATIO_W, tickHeight * CASTBAR_GLOW_RATIO_H
 end
 local QUEUE_POLL = 0.20
 

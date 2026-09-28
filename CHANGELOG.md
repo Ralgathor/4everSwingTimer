@@ -64,7 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   against the inset statusbar's height (bar height minus the 4 px top and
   bottom insets). The pip is sized to fit flush within the statusbar - the
   cast bar's own overhang ratio read too big in play - and the glow keeps
-  the cast bar's proportions relative to the pip. Applies to the queued state
+  the cast bar's proportions relative to the pip. The tick height is capped at
+  16px absolute - flush-linear scaling read enormous at the 40px maximum bar
+  height. Applies to the queued state
   and the red interrupt pip.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
