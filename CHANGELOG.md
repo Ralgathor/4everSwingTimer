@@ -77,3 +77,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0-4px sliver with the text floating over it. The floor is now 14px (fill
   never below 6px, text always fits inside the bar), and saved values under
   the old floor migrate up on load.
+- Fixed the tick and glow hanging outside the bar in drain mode: the pip was
+  anchored to the fill texture's edge, and a parked drain bar sits at value 0,
+  where the zero-width fill's edge left the tick and glow dangling off the
+  bar. The tick is now positioned manually like the cast bar's spark
+  (value * width from the statusbar's left), clamped inside the bar, and the
+  glow trails behind the tick per fill direction (left in fill mode, right in
+  drain).

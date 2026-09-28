@@ -365,6 +365,22 @@ function Bars:SetPaused(bar, paused)
 	bar.time:SetVertexColor(paused and 0.6 or 1.0, paused and 0.6 or 1.0, paused and 0.6 or 1.0)
 end
 
+-- Position the tick manually, the way the cast bar positions its spark
+-- (value * width from the statusbar's left), instead of anchoring to the
+-- fill texture's edge: in drain mode a parked bar sits at value 0, where the
+-- zero-width fill's edge left the tick and glow dangling outside the bar.
+-- Clamped inside so the tick stays visible at the extremes.
+function Bars:UpdateTickPosition(bar)
+	local statusWidth = bar.status:GetWidth()
+	if statusWidth <= 0 then
+		return
+	end
+	local pipWidth = bar.pip:GetWidth()
+	local x = bar.status:GetValue() * statusWidth
+	x = math.max(pipWidth / 2, math.min(x, statusWidth - pipWidth / 2))
+	bar.pip:SetPoint("CENTER", bar.status, "LEFT", x, 0)
+end
+
 -- The fill appearance: the skin's own fill art always; the queued state is a
 -- color change (the cast bar's yellow), while the tick swaps to the cast
 -- bar's pip with its glow streak. Flash tints layer on top of this base as
@@ -388,7 +404,13 @@ function Bars:ApplyFillStyle(bar)
 			texture:SetVertexColor(color[1], color[2], color[3])
 		end
 	end
-	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
+	-- The glow trails behind the tick: to its left when the bar fills up,
+	-- to its right when it drains (behind = the filled side either way).
+	if db.fill == "fill" then
+		bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
+	else
+		bar.queuedGlow:SetPoint("LEFT", bar.pip, "RIGHT", 2, 0)
+	end
 	if queued then
 		-- The cast bar's pip: ui-castingbar-pip, scaled to the bar height.
 		local pipW, pipH, glowW, glowH = CastBarTickSize()
@@ -408,6 +430,7 @@ function Bars:ApplyFillStyle(bar)
 			bar.pip:Hide()
 		end
 	end
+	self:UpdateTickPosition(bar)
 end
 
 -- The base fill color an interrupt/delay tint fades back to.
@@ -643,6 +666,7 @@ function Bars:OnUpdate()
 			else
 				bar.status:SetValue(1 - remaining / bar.speed)
 			end
+			self:UpdateTickPosition(bar)
 			if db.showTime then
 				if db.showSpeed then
 					bar.time:SetText(format("%.1f / %.2f", remaining, bar.speed))
@@ -735,6 +759,7 @@ function Bars:SwingStop(hand)
 	bar.expiration = nil
 	self:SetPaused(bar, false)
 	bar.status:SetValue(ParkedValue())
+	self:UpdateTickPosition(bar)
 	self:SetParkedText(bar)
 	bar.delta:SetText("")
 	self:UpdateVisibility()
