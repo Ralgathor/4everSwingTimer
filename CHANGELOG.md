@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial v1 implementation for WoW: Forever — main-hand, off-hand and ranged
   swing bars driven by LibClassicSwingTimerAPI (embedded), with cast-reset
-  (clipped) flash, paused tint, movement-cancel reschedules following the
+  (clipped) feedback that mirrors the client's interrupted-cast treatment
+  (red tint plus shake), paused tint, movement-cancel reschedules following the
   library's `UNIT_SWING_TIMER_UPDATE`, an optional main/off-hand delta text, and
   a one-time notice when the game's own swing timer bars are also enabled.
 - Three visibility modes mirroring the client's native swing timer (While
@@ -20,3 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per-character settings via the 12.x Settings API, `/4everswingtimer`
   (alias `/everswing`) with `unlock`, `lock`, `test`, `reset` subcommands, and a
   test-bars button on the unlock overlay.
+- Interrupt feedback modeled on the 12.x casting bar: a clipped swing (reset
+  by a cast) tints the fill red and shakes the bar for ~0.3 s; a
+  movement-delayed ranged swing (Auto Shot pushed back by the engine) tints
+  the bar amber so the reschedule is visible.

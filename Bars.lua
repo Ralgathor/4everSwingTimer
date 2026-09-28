@@ -51,8 +51,15 @@ local LIB_EVENTS = {
 	"UNIT_SWING_TIMER_STOP",
 	"UNIT_SWING_TIMER_DELTA",
 }
-local FLASH_TIME = 0.15
 local TEST_SPEED = 2.0
+-- Interrupt feedback, modeled on the 12.x casting bar's interrupted treatment
+-- (InterruptShakeAnim + InterruptGlow): a clipped swing tints red and shakes;
+-- a movement-delayed ranged swing tints amber. Tints decay back to the skin's
+-- normal fill after TINT_TIME seconds.
+local CLIP_TINT = { 1.0, 0.25, 0.20 }
+local DELAY_TINT = { 1.0, 0.60, 0.10 }
+local TINT_TIME = 0.30
+local SHAKE_STEP = 0.03
 
 local Bars = {}
 Addon.Bars = Bars
@@ -138,7 +145,7 @@ local function CreateBar(hand)
 	bar.pip:SetAtlas(PIP_ATLAS, true)
 	bar.pip:SetPoint("RIGHT", bar.status:GetStatusBarTexture(), "RIGHT", 0, 0)
 
-	-- Text and flash live on the StatusBar, not the bar frame: the StatusBar is
+	-- Text lives on the StatusBar, not the bar frame: the StatusBar is
 	-- a child frame and child frames draw on top of all their parent's regions,
 	-- so parented text would be hidden behind the fill texture. (The native
 	-- Blizzard bar parents its labels to the StatusBar for the same reason.)
@@ -153,10 +160,9 @@ local function CreateBar(hand)
 	bar.time:SetPoint("RIGHT", bar.status, "RIGHT", -5, 0)
 	bar.time:SetText("0.0")
 
-	bar.flash = bar.status:CreateTexture(nil, "OVERLAY")
-	bar.flash:SetAllPoints(bar)
-	bar.flash:SetColorTexture(1, 1, 1, 0.55)
-	bar.flash:Hide()
+	-- Interrupted-cast shake: alternating horizontal translation keyframes,
+	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
+	bar.shake = CreateShakeAnimation(bar)
 
 	bar.active = false
 	bar.paused = false
@@ -174,6 +180,50 @@ end
 -- empty in drain mode.
 local function ParkedValue()
 	return Addon.db.fill == "fill" and 1 or 0
+end
+
+local function CreateShakeAnimation(bar)
+	local group = bar:CreateAnimationGroup()
+	local offsets = { -5, 5, -4, 4, -3, 3, -2, 2, -1, 1, 0 }
+	for i = 1, #offsets do
+		local anim = group:CreateAnimation("Translation")
+		anim:SetOffset(offsets[i], 0)
+		anim:SetDuration(SHAKE_STEP)
+		anim:SetOrder(i)
+	end
+	return group
+end
+
+-- Temporarily tints the fill, then restores the skin's normal color. Works for
+-- both skins: the atlas fill of the native skin and the colored plain fill of
+-- the flat skin are both tinted via the statusbar texture's vertex color.
+function Bars:SetFillTint(bar, tint)
+	local texture = bar.status:GetStatusBarTexture()
+	if texture then
+		texture:SetVertexColor(tint[1], tint[2], tint[3])
+	end
+	if bar.tintTimer then
+		bar.tintTimer:Cancel()
+	end
+	bar.tintTimer = C_Timer.NewTimer(TINT_TIME, function()
+		Bars:RestoreFill(bar)
+	end)
+end
+
+function Bars:RestoreFill(bar)
+	if not bar then
+		return
+	end
+	local texture = bar.status:GetStatusBarTexture()
+	if not texture then
+		return
+	end
+	if Addon.db.skin == "native" then
+		texture:SetVertexColor(1, 1, 1)
+	else
+		local color = FLAT_COLORS[bar.hand]
+		bar.status:SetStatusBarColor(color[1], color[2], color[3])
+	end
 end
 
 function Bars:SetPaused(bar, paused)
@@ -388,10 +438,16 @@ end
 -- Library events
 -- ---------------------------------------------------------------------------
 
-function Bars:SwingStart(hand, speed, expirationTime)
+function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 	local bar = self.bars[hand]
 	if not bar then
 		return
+	end
+	-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
+	-- Auto Shot reschedule: the engine pushed the shot back. Show the delay.
+	if isUpdate and hand == "ranged" and bar.active
+		and expirationTime > (bar.expiration or 0) + 0.05 then
+		self:SetFillTint(bar, DELAY_TINT)
 	end
 	bar.speed = speed
 	bar.expiration = expirationTime
@@ -421,18 +477,18 @@ function Bars:SwingPaused(hand)
 	end
 end
 
+-- A swing reset by a cast: the interrupted-cast treatment - the fill turns
+-- red and the bar shakes, decaying back to normal while the new swing runs.
 function Bars:SwingClipped(hand)
 	local bar = self.bars[hand]
 	if not bar then
 		return
 	end
-	bar.flash:Show()
-	if bar.flashTimer then
-		bar.flashTimer:Cancel()
+	self:SetFillTint(bar, CLIP_TINT)
+	if bar.shake then
+		bar.shake:Stop()
+		bar.shake:Play()
 	end
-	bar.flashTimer = C_Timer.NewTimer(FLASH_TIME, function()
-		bar.flash:Hide()
-	end)
 end
 
 function Bars:SwingDelta(swingDelta)
@@ -520,7 +576,7 @@ function Bars:Enable(lib)
 		end
 		if event == "UNIT_SWING_TIMER_START" or event == "UNIT_SWING_TIMER_UPDATE" then
 			-- a = speed, b = expirationTime, c = hand
-			Bars:SwingStart(c, a, b)
+			Bars:SwingStart(c, a, b, event == "UNIT_SWING_TIMER_UPDATE")
 		elseif event == "UNIT_SWING_TIMER_STOP" then
 			Bars:SwingStop(a)
 		elseif event == "UNIT_SWING_TIMER_PAUSED" then

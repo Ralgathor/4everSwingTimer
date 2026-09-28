@@ -8,7 +8,8 @@ Unlike skins of the game's built-in swing timer, 4everSwingTimer is driven by
 which reconstructs your swing cycle instead of just re-anchoring at each swing.
 That means the bars also show what happens *between* swings:
 
-- cast-completion swing resets (flash + restart),
+- cast-completion swing resets (the bar turns red and shakes, like the
+  game's interrupted cast bar, then restarts),
 - paused swings (desaturated, dimmed),
 - clipped swings,
 - movement-cancelled Auto Shot reschedules,
