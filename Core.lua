@@ -84,6 +84,12 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 		if arg1 == ADDON_NAME then
 			ForeverSwingTimerDB = ForeverSwingTimerDB or {}
 			Addon.ApplyDefaults(ForeverSwingTimerDB, DEFAULTS)
+			-- The height slider's floor is 14 (the statusbar is inset 4px top
+			-- and bottom, so smaller heights collapse the fill); migrate any
+			-- value saved under the old 8px floor.
+			if ForeverSwingTimerDB.height < 14 then
+				ForeverSwingTimerDB.height = 14
+			end
 			Addon.db = ForeverSwingTimerDB
 			Addon.Options:Init()
 		end

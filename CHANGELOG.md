@@ -73,3 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hearthstone) with a 1 s retry, and on UNIT_INVENTORY_CHANGED for the player -
   the signal that equipment data has actually arrived, which on a first login
   happens after the loading screen completes.
+- Fixed degenerate low bar heights: the height slider's floor was 8px, below
+  the statusbar's 4px top and bottom insets, so the fill collapsed to a
+  0-4px sliver with the text floating over it. The floor is now 14px (fill
+  never below 6px, text always fits inside the bar), and saved values under
+  the old floor migrate up on load.

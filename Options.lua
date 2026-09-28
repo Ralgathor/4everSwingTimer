@@ -131,8 +131,9 @@ function Options:Init()
 	local width = ProxyNumber("width", "Width", db.width, 120, 400, 10, ApplyAll)
 	Settings.CreateSlider(category, width, Settings.CreateSliderOptions(120, 400, 10), "Bar width in pixels.")
 
-	local height = ProxyNumber("height", "Height", db.height, 8, 40, 1, ApplyAll)
-	Settings.CreateSlider(category, height, Settings.CreateSliderOptions(8, 40, 1), "Bar height in pixels.")
+	local height = ProxyNumber("height", "Height", db.height, 14, 40, 1, ApplyAll)
+	Settings.CreateSlider(category, height, Settings.CreateSliderOptions(14, 40, 1),
+		"Bar height in pixels. The minimum is 14: the fill is inset 4px top and bottom, and the text needs the remaining room.")
 
 	local gap = ProxyNumber("gap", "Spacing", db.gap, 0, 16, 1, ApplyAll)
 	Settings.CreateSlider(category, gap, Settings.CreateSliderOptions(0, 16, 1), "Space between bars in pixels.")
