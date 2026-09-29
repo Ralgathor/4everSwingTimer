@@ -100,16 +100,16 @@ function Options:Init()
 		{ value = "flat",   label = "Flat" },
 	}, function() Addon.Bars:ApplySkin() end)
 	Settings.CreateDropdown(category, skin, skinOptions,
-		"Native reuses the game's swing timer art. Flat uses plain colored bars.")
+		"Native reuses the game's swing timer art. Flat uses plain colored bars, styled by the Flat bar colors option below.")
 
 	local paletteEntries = {}
 	for i = 1, #Addon.FLAT_PALETTE_ORDER do
 		local key = Addon.FLAT_PALETTE_ORDER[i]
 		paletteEntries[#paletteEntries + 1] = { value = key, label = Addon.FLAT_PALETTES[key].label }
 	end
-	local palette, paletteOptions = ProxyString("flatPalette", "Bar colors", db.flatPalette, paletteEntries, ApplyAll)
+	local palette, paletteOptions = ProxyString("flatPalette", "Flat bar colors", db.flatPalette, paletteEntries, ApplyAll)
 	Settings.CreateDropdown(category, palette, paletteOptions,
-		"Flat bar style colors. Every palette stays clear of the effect colors (queued yellow, interrupt red, delay amber, haste green) so the effects always read.")
+		"Only applies to the Flat bar style (native uses the game's own art). Every palette stays clear of the effect colors (queued yellow, interrupt red, delay amber, haste green) so the effects always read.")
 
 	local fill, fillOptions = ProxyString("fill", "Bar direction", db.fill, {
 		{ value = "drain", label = "Drain (full to empty)" },
