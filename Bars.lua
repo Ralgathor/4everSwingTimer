@@ -116,12 +116,11 @@ local function TickHeight()
 	return math.max((Addon.db.height - STATUS_INSET_Y * 2) * TICK_STATUSBAR_RATIO, 8)
 end
 
--- The glow covers most of the fill height - a little less than the full
--- height (in-play feedback: full height was too much, the cast bar's own
--- 12-on-13 band floated with margins) - and keeps the cast bar's streak
--- width ratio relative to the bar (37 wide on a 13 px-tall cast bar).
+-- The glow uses the cast bar's own proportions, scaled to the fill: 12px on
+-- a 13px bar (~92% of the fill height - full height read too tall, 85% left
+-- the glow shorter than the tick's overhang) and 37 wide on the same bar.
 local CASTBAR_GLOW_WIDTH_RATIO = 37 / 13
-local CASTBAR_GLOW_HEIGHT_RATIO = 0.85
+local CASTBAR_GLOW_HEIGHT_RATIO = 12 / 13
 
 local function GlowSize()
 	local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
