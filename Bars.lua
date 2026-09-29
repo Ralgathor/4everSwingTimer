@@ -252,13 +252,36 @@ overlay.label = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall
 overlay.label:SetPoint("BOTTOM", overlay, "TOP", 0, 2)
 overlay.label:SetText("4everSwingTimer - drag to move")
 
-overlay.testButton = CreateFrame("Button", nil, overlay, "UIPanelButtonTemplate")
-overlay.testButton:SetSize(96, 22)
-overlay.testButton:SetPoint("TOP", overlay, "BOTTOM", 0, -2)
-overlay.testButton:SetText("Test bars")
-overlay.testButton:SetScript("OnClick", function()
+-- Test buttons under the bars (shown while unlocked): the swing animation
+-- and each effect treatment, all through the same handlers as the
+-- /4everswingtimer test commands.
+local function CreateOverlayButton(overlay, text, onClick)
+	local button = CreateFrame("Button", nil, overlay, "UIPanelButtonTemplate")
+	button:SetSize(74, 20)
+	button:SetText(text)
+	button:SetScript("OnClick", onClick)
+	return button
+end
+
+overlay.testButton = CreateOverlayButton(overlay, "Swing", function()
 	Bars:Test()
 end)
+overlay.testButton:SetPoint("TOPLEFT", overlay, "BOTTOMLEFT", 0, -2)
+local previous = overlay.testButton
+local effectButtons = {
+	{ label = "Interrupt", effect = "interrupt" },
+	{ label = "Haste", effect = "haste" },
+	{ label = "Delay", effect = "delay" },
+	{ label = "Queued", effect = "queued" },
+}
+for i = 1, #effectButtons do
+	local def = effectButtons[i]
+	local button = CreateOverlayButton(overlay, def.label, function()
+		Bars:TestEffect(def.effect)
+	end)
+	button:SetPoint("LEFT", previous, "RIGHT", 4, 0)
+	previous = button
+end
 
 -- Interrupted-cast shake: alternating horizontal translation keyframes with
 -- decaying amplitude (~0.7 s). Blizzard's exact InterruptShakeAnim was tested

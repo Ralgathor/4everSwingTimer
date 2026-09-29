@@ -146,3 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is factored into a shared handler so the test path exercises exactly the
   combat code. The test command's slash parsing now takes an argument, and
   the help text lists the new options.
+- Effect test buttons on the unlock overlay: a row of buttons under the bars
+  (Swing, Interrupt, Haste, Delay, Queued), each calling the same handlers as
+  the test commands - visible effect verification while dragging, no slash
+  typing needed.
