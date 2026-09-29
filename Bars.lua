@@ -379,11 +379,18 @@ local function CreateBar(hand)
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
 	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
 	bar.shake = CreateShakeAnimation(bar)
-	-- Early-landing (parry haste) pop and glow overlay.
+	-- Early-landing (parry haste) pop, and its outer glow adapted from the
+	-- cast bar's interrupt-glow pattern: an additive green halo extending
+	-- past the bar's frame (the interior portion reads as a wash over the
+	-- bar, like the native cast_interrupt_outerglow spans its bar), faded to
+	-- zero over the effect's duration. No green glow atlas exists, hence the
+	-- plain-color halo.
 	bar.pop = CreatePopAnimation(bar)
 	bar.hasteGlow = bar.status:CreateTexture(nil, "OVERLAY")
-	bar.hasteGlow:SetAllPoints(bar.status)
-	bar.hasteGlow:SetColorTexture(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3], HASTE_GLOW_ALPHA)
+	bar.hasteGlow:SetPoint("TOPLEFT", bar, "TOPLEFT", -6, 6)
+	bar.hasteGlow:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 6, -6)
+	bar.hasteGlow:SetColorTexture(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
+	bar.hasteGlow:SetBlendMode("ADD")
 	bar.hasteGlow:SetAlpha(0)
 	bar.hasteGlow:Hide()
 	bar.hasteGlowFade = bar.hasteGlow:CreateAnimationGroup()
@@ -844,6 +851,9 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 				-- hastened swing simply lands early - a mid-swing haste proc
 				-- produces the same signature).
 				self:SetFillTint(bar, HASTE_TINT)
+				-- Spark: the tick joins the haste color, restored with the
+				-- fade (FadeFillBack's final step re-applies the fill style).
+				bar.pip:SetVertexColor(HASTE_TINT[1], HASTE_TINT[2], HASTE_TINT[3])
 				if bar.pop then
 					bar.pop:Stop()
 					bar.pop:Play()

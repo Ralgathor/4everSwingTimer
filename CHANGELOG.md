@@ -134,3 +134,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   atlas / CASTBAR_CLASSIC_RED), the red pip, the tuned shake and this outer
   glow. The parry-haste and ranged-delay effects have no native analogs and
   stand as designed.
+- Parry-haste effect restructured onto the interrupt pattern (spark + outer
+  glow): the tick tints green for the duration of the effect (restored by the
+  fade's style re-apply), and the old full-fill green wash becomes an additive
+  green outer halo extending 6px past the bar's frame, matching how the cast
+  bar's interrupt glow spans its bar. The scale pop stays as the haste motion.
+  No green glow atlas exists in the client, hence the plain-color halo.
