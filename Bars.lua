@@ -116,14 +116,17 @@ local function TickHeight()
 	return math.max((Addon.db.height - STATUS_INSET_Y * 2) * TICK_STATUSBAR_RATIO, 8)
 end
 
--- The glow covers the ENTIRE fill height (no floating band with margins -
--- in-play feedback) and keeps the cast bar's streak width ratio relative to
--- the bar (37 wide on a 13 px-tall cast bar).
+-- The glow covers most of the fill height - a little less than the full
+-- height (in-play feedback: full height was too much, the cast bar's own
+-- 12-on-13 band floated with margins) - and keeps the cast bar's streak
+-- width ratio relative to the bar (37 wide on a 13 px-tall cast bar).
 local CASTBAR_GLOW_WIDTH_RATIO = 37 / 13
+local CASTBAR_GLOW_HEIGHT_RATIO = 0.85
 
 local function GlowSize()
 	local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
-	return math.max(fillHeight * CASTBAR_GLOW_WIDTH_RATIO, 8), math.max(fillHeight, 4)
+	return math.max(fillHeight * CASTBAR_GLOW_WIDTH_RATIO, 8),
+		math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4)
 end
 
 -- The swing bar's own pip at the automatic tick height, aspect preserved.
