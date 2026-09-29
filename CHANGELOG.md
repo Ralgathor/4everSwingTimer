@@ -93,12 +93,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the old floor migrate up on load.
 - Flat style palette retuned away from the effect palette: the old gold main
   hand swallowed the queued yellow tint and the crimson ranged bar swallowed
-  the interrupt red. The preset is now silver, blue and violet, so every
-  effect reads on every bar, with per-hand custom color pickers in the
-  settings panel behind a Bar colors dropdown (Preset / Custom); color
-  settings on this client are AARRGGBB hex strings (the swatch control feeds
-  the value into CreateColorFromHexString), so the proxies round-trip hex
-  strings declared as "string", with registration guarded.
+  the interrupt red (in the flat style the effects replace the bar color
+  wholesale, so a base near an effect color makes that effect invisible).
+  The Bar colors dropdown now offers curated palettes only - Silver/Blue/
+  Violet (default), Steel/Sky/Indigo, Graphite shades of gray, Rose/Ocean/
+  Plum - each chosen for distance from the effect colors, satisfying the
+  constraint by construction instead of leaving it to the user; free
+  per-hand color pickers were tried and removed for exactly that reason.
+  Palette keys saved by earlier builds migrate to the default.
 - Fixed the parry-haste feedback popping on ordinary swings: a stop counted as
   "in flight" with only 0.05 s remaining, but the engine's PLAYER_SWING
   anchor and the library's expiration timer race by up to a frame at every

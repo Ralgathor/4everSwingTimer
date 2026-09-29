@@ -36,15 +36,7 @@ local DEFAULTS = {
 	visibility = "combat", -- "swinging" | "combat" | "always"
 	skin = "native",       -- "native" | "flat"
 	fill = "drain",        -- "drain" | "fill"
-	flatPalette = "preset", -- "preset" | "custom" (flat style)
-	-- Flat style palette, retuned away from the effect palette (the old gold
-	-- main hand swallowed the queued yellow; crimson swallowed the interrupt
-	-- red): silver, blue, violet. Per-hand custom pickers in the settings.
-	colors = {
-		mainhand = { 0.92, 0.92, 0.95 },
-		offhand = { 0.36, 0.60, 1.00 },
-		ranged = { 0.70, 0.40, 0.90 },
-	},
+	flatPalette = "silver", -- key into Bars.FLAT_PALETTES (flat style)
 	showTime = true,
 	showSpeed = false,
 	showLabel = true,
@@ -98,6 +90,11 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 			-- value saved under the old 8px floor.
 			if ForeverSwingTimerDB.height < 14 then
 				ForeverSwingTimerDB.height = 14
+			end
+			-- Migrate palette keys saved by earlier builds (preset/custom
+			-- pickers) to the curated palette set.
+			if not (Addon.FLAT_PALETTES and Addon.FLAT_PALETTES[ForeverSwingTimerDB.flatPalette]) then
+				ForeverSwingTimerDB.flatPalette = Addon.FLAT_PALETTE_DEFAULT
 			end
 			Addon.db = ForeverSwingTimerDB
 			Addon.Options:Init()

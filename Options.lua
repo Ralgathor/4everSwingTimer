@@ -102,65 +102,14 @@ function Options:Init()
 	Settings.CreateDropdown(category, skin, skinOptions,
 		"Native reuses the game's swing timer art. Flat uses plain colored bars.")
 
-	local palette, paletteOptions = ProxyString("flatPalette", "Bar colors", db.flatPalette, {
-		{ value = "preset", label = "Preset (silver, blue, violet)" },
-		{ value = "custom", label = "Custom" },
-	}, function(value)
-		if value == "preset" then
-			-- Reset the live colors to the preset from the defaults.
-			for hand, color in pairs(Addon.DEFAULTS.colors) do
-				db.colors[hand] = { color[1], color[2], color[3] }
-			end
-			ApplyAll()
-		end
-	end)
+	local paletteEntries = {}
+	for i = 1, #Addon.FLAT_PALETTE_ORDER do
+		local key = Addon.FLAT_PALETTE_ORDER[i]
+		paletteEntries[#paletteEntries + 1] = { value = key, label = Addon.FLAT_PALETTES[key].label }
+	end
+	local palette, paletteOptions = ProxyString("flatPalette", "Bar colors", db.flatPalette, paletteEntries, ApplyAll)
 	Settings.CreateDropdown(category, palette, paletteOptions,
-		"Flat bar style colors. Preset resets the per-hand colors below to silver, blue and violet.")
-
-	-- Per-hand color swatches. This client's swatch control feeds the setting
-	-- value straight into CreateColorFromHexString (Blizzard_SettingControls
-	-- SetValue) - color settings are AARRGGBB HEX STRINGS here, not color
-	-- objects - so the proxy round-trips hex strings, declared as "string"
-	-- (the validator requires the declared type to equal type() of the
-	-- default). Registration stays guarded for any further surprises.
-	local function ToHex(color)
-		return string.format("FF%02X%02X%02X",
-			math.floor((color[1] or 0) * 255 + 0.5),
-			math.floor((color[2] or 0) * 255 + 0.5),
-			math.floor((color[3] or 0) * 255 + 0.5))
-	end
-	for i = 1, #Addon.HAND_ORDER do
-		local hand = Addon.HAND_ORDER[i]
-		local ok, setting = pcall(Settings.RegisterProxySetting, category,
-			VAR_PREFIX .. "color." .. hand, "string",
-			Addon.HAND_SETTING_NAME[hand] .. " color",
-			ToHex(db.colors[hand]),
-			function()
-				return ToHex(db.colors[hand])
-			end,
-			function(value)
-				if value then
-					local r, g, b
-					if type(value) == "string" and #value >= 8 then
-						-- AARRGGBB: the alpha pair is ignored (fills are opaque).
-						r = tonumber(value:sub(3, 4), 16) / 255
-						g = tonumber(value:sub(5, 6), 16) / 255
-						b = tonumber(value:sub(7, 8), 16) / 255
-					elseif value.GetRGB then
-						r, g, b = value:GetRGB()
-					end
-					if r and g and b then
-						db.colors[hand] = { r, g, b }
-						db.flatPalette = "custom"
-						ApplyAll()
-					end
-				end
-			end)
-		if ok and setting then
-			pcall(Settings.CreateColorSwatch, category, setting,
-				"Flat bar style: the " .. Addon.HAND_SETTING_NAME[hand] .. " fill color. Picking a color switches Bar colors to Custom. Avoid yellow, red, amber and green bases - the queued, interrupt, delay and haste effects replace the bar with those colors and will not read over a similar base.")
-		end
-	end
+		"Flat bar style colors. Every palette stays clear of the effect colors (queued yellow, interrupt red, delay amber, haste green) so the effects always read.")
 
 	local fill, fillOptions = ProxyString("fill", "Bar direction", db.fill, {
 		{ value = "drain", label = "Drain (full to empty)" },

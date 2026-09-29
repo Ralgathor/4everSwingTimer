@@ -31,8 +31,9 @@ The library ships embedded — no separate installation needed.
 
 Visibility modes (like the game's own swing timer): *While swinging*, *In
 combat*, or *Always* (when the hand has a weapon equipped). Bar style: *Native*
-(reuses the game's own swing timer art) or *Flat* (plain colored bars - silver,
-blue and violet by default, with per-hand custom color pickers).
+(reuses the game's own swing timer art) or *Flat* (plain colored bars, with
+curated palettes chosen so the queued/interrupt/delay/haste colors always
+read).
 
 ## Commands
 

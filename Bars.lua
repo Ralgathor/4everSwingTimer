@@ -40,18 +40,57 @@ local BACKGROUND_ATLAS = "ui-swingtimerbar-background"
 local BORDER_ATLAS = "ui-swingtimerbar-frame"
 local PIP_ATLAS = "ui-swingtimerbar-pip"
 local FLAT_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
--- Flat skin palette: the preset lives in DEFAULTS.colors (silver main hand,
--- blue off hand, violet ranged - retuned away from the effect palette: the
--- old gold main hand swallowed the queued yellow tint and the crimson ranged
--- bar swallowed the interrupt red). db.colors holds the live values, with
--- per-hand custom pickers in the settings panel.
+-- Flat style palettes: curated trios only, no free color pickers. In the
+-- flat style the effects REPLACE the bar color wholesale, so a base near an
+-- effect color makes that effect invisible (the original gold main hand
+-- swallowed the queued yellow; crimson swallowed the interrupt red). Every
+-- palette is chosen for distance from the effect colors - yellow (queued),
+-- red (interrupt), amber (delay), green (haste) - so the constraint is
+-- satisfied by construction rather than left to the user.
+local FLAT_PALETTES = {
+	silver = {
+		label = "Silver, Blue, Violet",
+		colors = {
+			mainhand = { 0.92, 0.92, 0.95 },
+			offhand = { 0.36, 0.60, 1.00 },
+			ranged = { 0.70, 0.40, 0.90 },
+		},
+	},
+	steel = {
+		label = "Steel, Sky, Indigo",
+		colors = {
+			mainhand = { 0.80, 0.85, 0.90 },
+			offhand = { 0.45, 0.75, 1.00 },
+			ranged = { 0.45, 0.45, 0.85 },
+		},
+	},
+	graphite = {
+		label = "Graphite (shades of gray)",
+		colors = {
+			mainhand = { 0.95, 0.95, 0.95 },
+			offhand = { 0.70, 0.70, 0.70 },
+			ranged = { 0.45, 0.45, 0.45 },
+		},
+	},
+	rose = {
+		label = "Rose, Ocean, Plum",
+		colors = {
+			mainhand = { 0.98, 0.55, 0.70 },
+			offhand = { 0.30, 0.65, 0.95 },
+			ranged = { 0.55, 0.35, 0.75 },
+		},
+	},
+}
+local FLAT_PALETTE_ORDER = { "silver", "steel", "graphite", "rose" }
+local FLAT_PALETTE_DEFAULT = "silver"
+Addon.FLAT_PALETTES = FLAT_PALETTES
+Addon.FLAT_PALETTE_ORDER = FLAT_PALETTE_ORDER
+Addon.FLAT_PALETTE_DEFAULT = FLAT_PALETTE_DEFAULT
+
 local function FlatColor(hand)
-	local color = Addon.db.colors and Addon.db.colors[hand]
-	if type(color) == "table" and color[1] and color[2] and color[3] then
-		return color[1], color[2], color[3]
-	end
-	local preset = Addon.DEFAULTS.colors[hand]
-	return preset[1], preset[2], preset[3]
+	local palette = FLAT_PALETTES[Addon.db.flatPalette] or FLAT_PALETTES[FLAT_PALETTE_DEFAULT]
+	local color = palette.colors[hand]
+	return color[1], color[2], color[3]
 end
 local LIB_EVENTS = {
 	"UNIT_SWING_TIMER_INFO_INITIALIZED",
