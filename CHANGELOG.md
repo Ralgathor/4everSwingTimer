@@ -140,3 +140,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   green outer halo extending 6px past the bar's frame, matching how the cast
   bar's interrupt glow spans its bar. The scale pop stays as the haste motion.
   No green glow atlas exists in the client, hence the plain-color halo.
+- Effect test commands: "/4everswingtimer test interrupt|haste|delay|queued"
+  triggers each treatment on the enabled bars without waiting for combat
+  events, and "test effects" plays them all in sequence - the haste treatment
+  is factored into a shared handler so the test path exercises exactly the
+  combat code. The test command's slash parsing now takes an argument, and
+  the help text lists the new options.

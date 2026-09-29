@@ -41,7 +41,9 @@ read).
 |---|---|
 | `/4everswingtimer` (alias `/everswing`) | open settings, or run a subcommand |
 | `... unlock` / `... lock` | show the drag overlay / lock the bars |
-| `... test` | animate a fake 2.0s swing on all enabled bars |
+| `/4everswingtimer test` | animate a fake 2.0s swing on all enabled bars |
+| `... test interrupt` / `haste` / `delay` / `queued` | trigger any effect on demand |
+| `... test effects` | play all effects in sequence |
 | `... reset` | reset the bar position |
 
 Settings are per-character and also available under Game Settings > Addons.

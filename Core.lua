@@ -180,7 +180,7 @@ SLASH_4EVERSWINGTIMER1 = "/4everswingtimer"
 SLASH_4EVERSWINGTIMER2 = "/everswing"
 
 SlashCmdList["4EVERSWINGTIMER"] = function(msg)
-	local command = strtrim(msg or ""):lower()
+	local command, arg = strtrim(msg or ""):lower():match("^(%S+)%s*(.-)$")
 	if command == "" or command == "config" or command == "options" then
 		Addon.Options:Open()
 	elseif command == "lock" then
@@ -192,7 +192,21 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 		Addon.Bars:SetLocked(false)
 		Addon:Print("Bars unlocked - drag them to move. Lock with |cffdddddd/4everswingtimer lock|r or in settings.")
 	elseif command == "test" then
-		Addon.Bars:Test()
+		if arg == "" then
+			Addon.Bars:Test()
+		elseif arg == "interrupt" or arg == "clip" then
+			Addon.Bars:TestEffect("interrupt")
+		elseif arg == "haste" or arg == "parry" then
+			Addon.Bars:TestEffect("haste")
+		elseif arg == "delay" or arg == "ranged" then
+			Addon.Bars:TestEffect("delay")
+		elseif arg == "queued" or arg == "queue" then
+			Addon.Bars:TestEffect("queued")
+		elseif arg == "effects" or arg == "all" then
+			Addon.Bars:TestEffect("all")
+		else
+			Addon:Print("Unknown test: " .. arg .. ". Try |cffddddddtest interrupt|haste|delay|queued|effects|r")
+		end
 	elseif command == "debug" then
 		Addon.Bars:Debug()
 	elseif command == "reset" then
@@ -205,7 +219,7 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 		Addon.Bars:RestorePosition()
 		Addon:Print("Position reset.")
 	elseif command == "help" then
-		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), unlock, lock, test, reset, help")
+		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), unlock, lock, test [interrupt|haste|delay|queued|effects], debug, reset, help")
 	else
 		Addon:Print("Unknown command: " .. command .. ". Try |cffdddddd/4everswingtimer help|r")
 	end

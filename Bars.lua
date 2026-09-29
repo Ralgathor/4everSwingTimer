@@ -850,20 +850,8 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 				-- addon-facing parry API exists; the library re-anchors and the
 				-- hastened swing simply lands early - a mid-swing haste proc
 				-- produces the same signature).
-				self:SetFillTint(bar, HASTE_TINT)
-				-- Spark: the tick joins the haste color, restored with the
-				-- fade (FadeFillBack's final step re-applies the fill style).
-				bar.pip:SetVertexColor(HASTE_TINT[1], HASTE_TINT[2], HASTE_TINT[3])
-				if bar.pop then
-					bar.pop:Stop()
-					bar.pop:Play()
-				end
-				if bar.hasteGlow and bar.hasteGlowFade then
-					bar.hasteGlow:Show()
-					bar.hasteGlowFade:Stop()
-					bar.hasteGlowFade:Play()
-				end
-			else
+				self:HasteFeedback(bar)
+		else
 				-- Different weapon speed: a weapon swap restart; the old swing
 				-- was cut short.
 				self:InterruptFeedback(bar)
@@ -939,6 +927,25 @@ end
 
 -- The interrupted-cast treatment (red tint + red pip + shake), shared by the
 -- clip event and in-flight stops.
+-- The parry-haste treatment: fill tint, green spark, pop and outer glow.
+-- Shared by the early-landing detection and the test command, so the test
+-- path exercises exactly the combat code.
+function Bars:HasteFeedback(bar)
+	self:SetFillTint(bar, HASTE_TINT)
+	-- Spark: the tick joins the haste color, restored with the fade
+	-- (FadeFillBack's final step re-applies the fill style).
+	bar.pip:SetVertexColor(HASTE_TINT[1], HASTE_TINT[2], HASTE_TINT[3])
+	if bar.pop then
+		bar.pop:Stop()
+		bar.pop:Play()
+	end
+	if bar.hasteGlow and bar.hasteGlowFade then
+		bar.hasteGlow:Show()
+		bar.hasteGlowFade:Stop()
+		bar.hasteGlowFade:Play()
+	end
+end
+
 function Bars:InterruptFeedback(bar)
 	self:SetFillTint(bar, CLIP_TINT)
 	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas,
@@ -1026,6 +1033,66 @@ function Bars:Test()
 			self:SwingStop(HAND_ORDER[i])
 		end
 	end)
+end
+
+-- Effect test modes, so visual feedback changes can be verified without
+-- waiting for combat events: each triggers the real treatment code path on
+-- the enabled bars. Used by "/4everswingtimer test <effect>".
+local TEST_QUEUED_TIME = 3.0
+
+function Bars:TestEffect(effect)
+	if not self.bars then
+		return
+	end
+	local db = Addon.db
+	local function ForEnabled(func)
+		for i = 1, #HAND_ORDER do
+			local hand = HAND_ORDER[i]
+			local bar = self.bars[hand]
+			if db.enabled[hand] then
+				func(bar)
+			end
+		end
+	end
+	if effect == "interrupt" then
+		ForEnabled(function(bar)
+			self:InterruptFeedback(bar)
+		end)
+	elseif effect == "haste" then
+		ForEnabled(function(bar)
+			self:HasteFeedback(bar)
+		end)
+	elseif effect == "delay" then
+		ForEnabled(function(bar)
+			self:SetFillTint(bar, DELAY_TINT)
+		end)
+	elseif effect == "queued" then
+		local bar = self.bars.mainhand
+		if db.enabled.mainhand and bar then
+			bar.queued = true
+			self:ApplyFillStyle(bar)
+			if self.queuedTestTimer then
+				self.queuedTestTimer:Cancel()
+			end
+			self.queuedTestTimer = C_Timer.NewTimer(TEST_QUEUED_TIME, function()
+				bar.queued = false
+				self:ApplyFillStyle(bar)
+			end)
+		end
+	elseif effect == "all" then
+		self:TestEffect("interrupt")
+		C_Timer.After(1.5, function()
+			self:TestEffect("haste")
+		end)
+		C_Timer.After(3.0, function()
+			self:TestEffect("delay")
+		end)
+		C_Timer.After(4.5, function()
+			self:TestEffect("queued")
+		end)
+	else
+		Addon:Print("Unknown test effect: " .. tostring(effect))
+	end
 end
 
 function Bars:ApplyAll()
