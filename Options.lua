@@ -158,7 +158,7 @@ function Options:Init()
 			end)
 		if ok and setting then
 			pcall(Settings.CreateColorSwatch, category, setting,
-				"Flat bar style: the " .. Addon.HAND_SETTING_NAME[hand] .. " fill color. Picking a color switches Bar colors to Custom.")
+				"Flat bar style: the " .. Addon.HAND_SETTING_NAME[hand] .. " fill color. Picking a color switches Bar colors to Custom. Avoid yellow, red, amber and green bases - the queued, interrupt, delay and haste effects replace the bar with those colors and will not read over a similar base.")
 		end
 	end
 
