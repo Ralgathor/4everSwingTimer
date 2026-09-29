@@ -768,11 +768,18 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 				self:InterruptFeedback(bar)
 			end
 		end
-	elseif hand == "ranged" and bar.active
-		and expirationTime > (bar.expiration or 0) + 0.05 then
+	elseif hand == "ranged" and bar.active then
 		-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
-		-- Auto Shot reschedule: the engine pushed the shot back. Show the delay.
-		self:SetFillTint(bar, DELAY_TINT)
+		-- Auto Shot reschedule: the engine re-attempts the shot and the
+		-- library predicts the next landing at now + ~0.5 s (measured recasts
+		-- 0.43-0.56 s). Detect that signature directly - comparing the new
+		-- expiration against the old one misses fails early in the cast
+		-- window, where the reschedule lands close to the original time and
+		-- the push is below the threshold.
+		local recast = expirationTime - GetTime()
+		if recast > 0.3 and recast < 0.7 then
+			self:SetFillTint(bar, DELAY_TINT)
+		end
 	end
 	bar.speed = speed
 	bar.expiration = expirationTime

@@ -79,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hearthstone) with a 1 s retry, and on UNIT_INVENTORY_CHANGED for the player -
   the signal that equipment data has actually arrived, which on a first login
   happens after the loading screen completes.
+- Fixed the ranged delay feedback not firing on movement-cancelled Auto
+  Shots: the detection compared the new expiration against the old one, but a
+  fail early in the cast window reschedules to nearly the original landing
+  time (recast ~0.5 s), so the push was below the threshold. The detection now
+  keys on the library's reschedule signature itself - a ranged UPDATE landing
+  at now + ~0.5 s (measured recasts 0.43-0.56 s, window 0.3-0.7) - which is
+  the only ranged UPDATE source on WoW: Forever.
 - Fixed degenerate low bar heights: the height slider's floor was 8px, below
   the statusbar's 4px top and bottom insets, so the fill collapsed to a
   0-4px sliver with the text floating over it. The floor is now 14px (fill
