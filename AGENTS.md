@@ -61,8 +61,10 @@ Do not commit `Libs/` or `.release/` — generated and gitignored.
   with proxy settings (`Settings.RegisterProxySetting`).
 - The vertical layout has **no button control** — buttons go on the bar overlay
   or slash commands, not the settings panel.
-- `Settings.VarType` on this client has no Color — no color pickers in v1
-  (flat skin uses preset per-hand colors).
+- `Settings.VarType` on this client has no Color — no color pickers; the flat
+  style uses curated palettes (see FLAT_PALETTES in Bars.lua) chosen for
+  distance from the effect colors. If a settings value must match a validator
+  type, the declared type string must equal Lua's `type()` of the value.
 
 ## Verification
 
