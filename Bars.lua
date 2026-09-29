@@ -112,8 +112,13 @@ local CASTBAR_PIP_RATIO_W = 8 / 20
 local CASTBAR_GLOW_RATIO_W = 37 / 20
 local CASTBAR_GLOW_RATIO_H = 12 / 20
 
+-- Shared tick-height floor across all tick variants.
+local function TickHeight()
+	return math.max(Addon.db.tickSize or 14, 4)
+end
+
 local function CastBarTickSize()
-	local tickHeight = math.max(Addon.db.tickSize or 14, 4)
+	local tickHeight = TickHeight()
 	return tickHeight * CASTBAR_PIP_RATIO_W, tickHeight,
 		tickHeight * CASTBAR_GLOW_RATIO_W, tickHeight * CASTBAR_GLOW_RATIO_H
 end
@@ -433,6 +438,13 @@ function Bars:ApplyFillStyle(bar)
 		bar.glowWanted = true
 	else
 		bar.pip:SetAtlas(PIP_ATLAS, true)
+		-- The native tick follows the Tick size setting too: read its atlas
+		-- aspect and scale the height to the same floor as the cast tick.
+		local nativeW, nativeH = bar.pip:GetSize()
+		local tickHeight = TickHeight()
+		if nativeH and nativeH > 0 then
+			bar.pip:SetSize(tickHeight * (nativeW / nativeH), tickHeight)
+		end
 		bar.pip:SetVertexColor(1, 1, 1)
 		bar.glowWanted = false
 		if db.skin == "native" then
