@@ -65,6 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in-play feedback: the queued state differentiates by the cast-bar yellow
   fill and the glow, not by swapping tick art. The interrupted state keeps
   the cast bar's red pip (ui-castingbar-pip-red), scaled the same way.
+- The glow covers the entire fill height instead of the cast bar's own
+  12px-on-13px band, which floated mid-fill with visible margins (in-play
+  feedback); its width keeps the cast bar's streak ratio relative to the bar
+  (37 wide on a 13px cast bar).
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned

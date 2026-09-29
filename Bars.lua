@@ -108,20 +108,22 @@ local STATUS_INSET_Y = 4
 -- maximum - both equal to their statusbar height x ~1.1). No manual setting:
 -- the tick follows the bar, with a floor so tiny bars still show one. One
 -- tick identity everywhere: the swing bar's own pip atlas, height-scaled via
--- its own aspect. The glow keeps the cast bar's proportions relative to the
--- tick (37x12 glow vs 8x20 pip).
+-- its own aspect.
 local TICK_STATUSBAR_RATIO = 1.1
-local CASTBAR_GLOW_RATIO_W = 37 / 20
-local CASTBAR_GLOW_RATIO_H = 12 / 20
 
 -- Shared tick height across all tick variants.
 local function TickHeight()
 	return math.max((Addon.db.height - STATUS_INSET_Y * 2) * TICK_STATUSBAR_RATIO, 8)
 end
 
+-- The glow covers the ENTIRE fill height (no floating band with margins -
+-- in-play feedback) and keeps the cast bar's streak width ratio relative to
+-- the bar (37 wide on a 13 px-tall cast bar).
+local CASTBAR_GLOW_WIDTH_RATIO = 37 / 13
+
 local function GlowSize()
-	local tickHeight = TickHeight()
-	return tickHeight * CASTBAR_GLOW_RATIO_W, tickHeight * CASTBAR_GLOW_RATIO_H
+	local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
+	return math.max(fillHeight * CASTBAR_GLOW_WIDTH_RATIO, 8), math.max(fillHeight, 4)
 end
 
 -- The swing bar's own pip at the automatic tick height, aspect preserved.
