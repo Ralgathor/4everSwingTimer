@@ -91,6 +91,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0-4px sliver with the text floating over it. The floor is now 14px (fill
   never below 6px, text always fits inside the bar), and saved values under
   the old floor migrate up on load.
+- Fixed the parry-haste feedback popping on ordinary swings: a stop counted as
+  "in flight" with only 0.05 s remaining, but the engine's PLAYER_SWING
+  anchor and the library's expiration timer race by up to a frame at every
+  swing - whenever the engine won, a normal completion read as an early
+  landing. The in-flight threshold is now 0.2 s, far above frame jitter and
+  far below a genuine parry-haste landing (~40% of weapon speed early).
 - Text scaling: the hand label, time and delta font height now tracks the
   bar height (0.66x, clamped to 9-14 px - the 18px cap read far too large in play) instead of the fixed small font,
   which read shrunken on tall bars. The font stays the game's standard text

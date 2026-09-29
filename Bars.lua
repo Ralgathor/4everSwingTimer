@@ -81,6 +81,13 @@ local HASTE_GLOW_ALPHA = 0.5
 local HASTE_GLOW_TIME = 0.5
 local HASTE_POP_SCALE = 1.15
 local STOP_GRACE = 0.10
+-- A swing stopping with less than this remaining is a natural completion,
+-- not an early landing: the engine's PLAYER_SWING and the library's own
+-- expiration timer race by up to a frame at every swing, and that jitter
+-- must not read as parry haste. Genuine parry haste lands the swing at
+-- least ~40% of the weapon speed early (floored at 20% remaining), far
+-- above this threshold.
+local EARLY_LANDING_EPSILON = 0.2
 -- Queued next-melee highlight: while a next-melee ability is queued (base IDs;
 -- ranks resolve through the base), the main-hand fill takes the queue color
 -- and the pip - the tick riding the fill edge - gets an additive glow,
@@ -796,12 +803,14 @@ function Bars:SwingStop(hand)
 	if not bar then
 		return
 	end
-	-- A stop while the swing is still in flight means the swing was cut short
-	-- or landed early; WHICH of the two is only knowable after a short grace
-	-- period, because the library fires a restart as STOP+START inside one
-	-- call. Record the facts and let the grace timer (or the START that beats
-	-- it) decide the feedback.
-	bar.stoppedInFlight = (bar.active and bar.expiration and bar.expiration > GetTime() + 0.05) or nil
+	-- A stop while the swing is still in flight means the swing was cut
+	-- short or landed early; WHICH of the two is only knowable after a short
+	-- grace period, because the library fires a restart as STOP+START inside
+	-- one call. The epsilon must exceed the frame race between the engine's
+	-- PLAYER_SWING anchor and the library's expiration timer (see
+	-- EARLY_LANDING_EPSILON) - a bare "anything remaining" check popped the
+	-- haste feedback on ordinary swings whenever the engine won the race.
+	bar.stoppedInFlight = (bar.active and bar.expiration and bar.expiration > GetTime() + EARLY_LANDING_EPSILON) or nil
 	bar.stoppedAt = GetTime()
 	bar.speedAtStop = bar.speed
 	bar.stopGen = (bar.stopGen or 0) + 1
