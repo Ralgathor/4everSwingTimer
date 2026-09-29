@@ -40,11 +40,19 @@ local BACKGROUND_ATLAS = "ui-swingtimerbar-background"
 local BORDER_ATLAS = "ui-swingtimerbar-frame"
 local PIP_ATLAS = "ui-swingtimerbar-pip"
 local FLAT_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
-local FLAT_COLORS = {
-	mainhand = { 1.00, 0.82, 0.00 },
-	offhand = { 0.36, 0.60, 1.00 },
-	ranged = { 0.90, 0.30, 0.36 },
-}
+-- Flat skin palette: the preset lives in DEFAULTS.colors (silver main hand,
+-- blue off hand, violet ranged - retuned away from the effect palette: the
+-- old gold main hand swallowed the queued yellow tint and the crimson ranged
+-- bar swallowed the interrupt red). db.colors holds the live values, with
+-- per-hand custom pickers in the settings panel.
+local function FlatColor(hand)
+	local color = Addon.db.colors and Addon.db.colors[hand]
+	if type(color) == "table" and color[1] and color[2] and color[3] then
+		return color[1], color[2], color[3]
+	end
+	local preset = Addon.DEFAULTS.colors[hand]
+	return preset[1], preset[2], preset[3]
+end
 local LIB_EVENTS = {
 	"UNIT_SWING_TIMER_INFO_INITIALIZED",
 	"UNIT_SWING_TIMER_START",
@@ -440,8 +448,7 @@ function Bars:ApplyFillStyle(bar)
 		elseif db.skin == "native" then
 			texture:SetVertexColor(1, 1, 1)
 		else
-			local color = FLAT_COLORS[bar.hand]
-			texture:SetVertexColor(color[1], color[2], color[3])
+			texture:SetVertexColor(FlatColor(bar.hand))
 		end
 	end
 	-- The glow trails to the tick's left (the cast bar's own anchor, +2px) -
@@ -482,8 +489,7 @@ function Bars:GetBaseFillColor(bar)
 	if db.skin == "native" then
 		return 1, 1, 1
 	end
-	local color = FLAT_COLORS[bar.hand]
-	return color[1], color[2], color[3]
+	return FlatColor(bar.hand)
 end
 
 -- Polled at QUEUE_POLL: no event exists for queued-state changes, and

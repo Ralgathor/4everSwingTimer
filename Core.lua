@@ -36,6 +36,15 @@ local DEFAULTS = {
 	visibility = "combat", -- "swinging" | "combat" | "always"
 	skin = "native",       -- "native" | "flat"
 	fill = "drain",        -- "drain" | "fill"
+	flatPalette = "preset", -- "preset" | "custom" (flat style)
+	-- Flat style palette, retuned away from the effect palette (the old gold
+	-- main hand swallowed the queued yellow; crimson swallowed the interrupt
+	-- red): silver, blue, violet. Per-hand custom pickers in the settings.
+	colors = {
+		mainhand = { 0.92, 0.92, 0.95 },
+		offhand = { 0.36, 0.60, 1.00 },
+		ranged = { 0.70, 0.40, 0.90 },
+	},
 	showTime = true,
 	showSpeed = false,
 	showLabel = true,

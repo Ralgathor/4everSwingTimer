@@ -102,6 +102,57 @@ function Options:Init()
 	Settings.CreateDropdown(category, skin, skinOptions,
 		"Native reuses the game's swing timer art. Flat uses plain colored bars.")
 
+	local palette, paletteOptions = ProxyString("flatPalette", "Bar colors", db.flatPalette, {
+		{ value = "preset", label = "Preset (silver, blue, violet)" },
+		{ value = "custom", label = "Custom" },
+	}, function(value)
+		if value == "preset" then
+			-- Reset the live colors to the preset from the defaults.
+			for hand, color in pairs(Addon.DEFAULTS.colors) do
+				db.colors[hand] = { color[1], color[2], color[3] }
+			end
+			ApplyAll()
+		end
+	end)
+	Settings.CreateDropdown(category, palette, paletteOptions,
+		"Flat bar style colors. Preset resets the per-hand colors below to silver, blue and violet.")
+
+	-- Per-hand color swatches. This client's Settings.VarType has no Color
+	-- entry, so the swatch registration is guarded: if the client rejects a
+	-- color-valued proxy setting, the preset dropdown above still works.
+	if CreateColor then
+		for i = 1, #Addon.HAND_ORDER do
+			local hand = Addon.HAND_ORDER[i]
+			local ok, setting = pcall(Settings.RegisterProxySetting, category,
+				VAR_PREFIX .. "color." .. hand, "color",
+				Addon.HAND_SETTING_NAME[hand] .. " color",
+				CreateColor(db.colors[hand][1], db.colors[hand][2], db.colors[hand][3], 1),
+				function()
+					local c = db.colors[hand]
+					return CreateColor(c[1], c[2], c[3], 1)
+				end,
+				function(value)
+					if value then
+						local r, g, b
+						if value.GetRGB then
+							r, g, b = value:GetRGB()
+						else
+							r = value.r or (type(value) == "table" and value[1]) or 1
+							g = value.g or (type(value) == "table" and value[2]) or 1
+							b = value.b or (type(value) == "table" and value[3]) or 1
+						end
+						db.colors[hand] = { r, g, b }
+						db.flatPalette = "custom"
+						ApplyAll()
+					end
+				end)
+			if ok and setting then
+				pcall(Settings.CreateColorSwatch, category, setting,
+					"Flat bar style: the " .. Addon.HAND_SETTING_NAME[hand] .. " fill color. Picking a color switches Bar colors to Custom.")
+			end
+		end
+	end
+
 	local fill, fillOptions = ProxyString("fill", "Bar direction", db.fill, {
 		{ value = "drain", label = "Drain (full to empty)" },
 		{ value = "fill",  label = "Fill (empty to full)" },

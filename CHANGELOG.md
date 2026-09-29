@@ -91,6 +91,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0-4px sliver with the text floating over it. The floor is now 14px (fill
   never below 6px, text always fits inside the bar), and saved values under
   the old floor migrate up on load.
+- Flat style palette retuned away from the effect palette: the old gold main
+  hand swallowed the queued yellow tint and the crimson ranged bar swallowed
+  the interrupt red. The preset is now silver, blue and violet, so every
+  effect reads on every bar, with per-hand custom color pickers in the
+  settings panel behind a Bar colors dropdown (Preset / Custom); the swatch
+  registration is guarded because this client's Settings.VarType has no
+  Color entry - if the client rejects color-valued settings, the preset
+  dropdown still applies.
 - Fixed the parry-haste feedback popping on ordinary swings: a stop counted as
   "in flight" with only 0.05 s remaining, but the engine's PLAYER_SWING
   anchor and the library's expiration timer race by up to a frame at every
