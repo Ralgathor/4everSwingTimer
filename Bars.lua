@@ -39,6 +39,7 @@ local FILL_ATLAS = {
 local BACKGROUND_ATLAS = "ui-swingtimerbar-background"
 local BORDER_ATLAS = "ui-swingtimerbar-frame"
 local PIP_ATLAS = "ui-swingtimerbar-pip"
+local LABEL_SHADOW_ATLAS = "ui-swingtimerbar-textshadow-left"
 local FLAT_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 -- Flat style palettes: curated trios only, no free color pickers. In the
 -- flat style the effects REPLACE the bar color wholesale, so a base near an
@@ -331,15 +332,24 @@ local function CreateBar(hand)
 	-- a child frame and child frames draw on top of all their parent's regions,
 	-- so parented text would be hidden behind the fill texture. (The native
 	-- Blizzard bar parents its labels to the StatusBar for the same reason.)
+	-- The label shadow matches the native bar's TypeLabelShadow (171px wide,
+	-- left-anchored, full statusbar height) and is created before the text so
+	-- it draws under it.
+	bar.labelShadow = bar.status:CreateTexture(nil, "OVERLAY")
+	bar.labelShadow:SetAtlas(LABEL_SHADOW_ATLAS)
+	bar.labelShadow:SetWidth(171)
+	bar.labelShadow:SetPoint("TOPLEFT", bar.status, "TOPLEFT", 0, 0)
+	bar.labelShadow:SetPoint("BOTTOMLEFT", bar.status, "BOTTOMLEFT", 0, 0)
+
 	bar.label = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	bar.label:SetPoint("LEFT", bar.status, "LEFT", 5, 0)
+	bar.label:SetPoint("LEFT", bar.status, "LEFT", 10, 0)
 	bar.label:SetText(HAND_LABEL[hand])
 
 	bar.delta = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	bar.delta:SetPoint("LEFT", bar.label, "RIGHT", 8, 0)
 
 	bar.time = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	bar.time:SetPoint("RIGHT", bar.status, "RIGHT", -5, 0)
+	bar.time:SetPoint("RIGHT", bar.status, "RIGHT", -10, 0)
 	bar.time:SetText("0.0")
 
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
@@ -580,9 +590,11 @@ function Bars:ApplySkin()
 		if native then
 			bar.bg:SetAtlas(BACKGROUND_ATLAS)
 			bar.border:SetAtlas(BORDER_ATLAS)
+			bar.labelShadow:Show()
 		else
 			bar.bg:SetColorTexture(0, 0, 0, 0.55)
 			bar.border:SetColorTexture(0, 0, 0, 0.85)
+			bar.labelShadow:Hide()
 		end
 		-- The fill and pip follow the queued state first, the skin second.
 		self:ApplyFillStyle(bar)

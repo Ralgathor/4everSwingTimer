@@ -101,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constraint by construction instead of leaving it to the user; free
   per-hand color pickers were tried and removed for exactly that reason.
   Palette keys saved by earlier builds migrate to the default.
+- Native skin parity with the game's own swing timer, from a source diff of
+  Blizzard_SwingTimer: the label now sits on the native bar's text shadow
+  (ui-swingtimerbar-textshadow-left, 171px, left-anchored, full statusbar
+  height - the native bar's distinctive left-side darkening), shown only in
+  the native style, and the label/time insets match the native x=10 / x=-10
+  (we were 5px too close to each edge).
 - Fixed the parry-haste feedback popping on ordinary swings: a stop counted as
   "in flight" with only 0.05 s remaining, but the engine's PLAYER_SWING
   anchor and the library's expiration timer race by up to a frame at every
