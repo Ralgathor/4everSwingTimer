@@ -117,41 +117,48 @@ function Options:Init()
 	Settings.CreateDropdown(category, palette, paletteOptions,
 		"Flat bar style colors. Preset resets the per-hand colors below to silver, blue and violet.")
 
-	-- Per-hand color swatches. The settings validator requires the declared
-	-- variable type to equal Lua's type() of the default value - a CreateColor
-	-- object is a "table" (this client's Settings.VarType has no Color entry,
-	-- and "color" is rejected). The swatch control works off the value being a
-	-- color object; registration stays guarded for any further surprises.
-	if CreateColor then
-		for i = 1, #Addon.HAND_ORDER do
-			local hand = Addon.HAND_ORDER[i]
-			local ok, setting = pcall(Settings.RegisterProxySetting, category,
-				VAR_PREFIX .. "color." .. hand, "table",
-				Addon.HAND_SETTING_NAME[hand] .. " color",
-				CreateColor(db.colors[hand][1], db.colors[hand][2], db.colors[hand][3], 1),
-				function()
-					local c = db.colors[hand]
-					return CreateColor(c[1], c[2], c[3], 1)
-				end,
-				function(value)
-					if value then
-						local r, g, b
-						if value.GetRGB then
-							r, g, b = value:GetRGB()
-						else
-							r = value.r or (type(value) == "table" and value[1]) or 1
-							g = value.g or (type(value) == "table" and value[2]) or 1
-							b = value.b or (type(value) == "table" and value[3]) or 1
-						end
+	-- Per-hand color swatches. This client's swatch control feeds the setting
+	-- value straight into CreateColorFromHexString (Blizzard_SettingControls
+	-- SetValue) - color settings are AARRGGBB HEX STRINGS here, not color
+	-- objects - so the proxy round-trips hex strings, declared as "string"
+	-- (the validator requires the declared type to equal type() of the
+	-- default). Registration stays guarded for any further surprises.
+	local function ToHex(color)
+		return string.format("FF%02X%02X%02X",
+			math.floor((color[1] or 0) * 255 + 0.5),
+			math.floor((color[2] or 0) * 255 + 0.5),
+			math.floor((color[3] or 0) * 255 + 0.5))
+	end
+	for i = 1, #Addon.HAND_ORDER do
+		local hand = Addon.HAND_ORDER[i]
+		local ok, setting = pcall(Settings.RegisterProxySetting, category,
+			VAR_PREFIX .. "color." .. hand, "string",
+			Addon.HAND_SETTING_NAME[hand] .. " color",
+			ToHex(db.colors[hand]),
+			function()
+				return ToHex(db.colors[hand])
+			end,
+			function(value)
+				if value then
+					local r, g, b
+					if type(value) == "string" and #value >= 8 then
+						-- AARRGGBB: the alpha pair is ignored (fills are opaque).
+						r = tonumber(value:sub(3, 4), 16) / 255
+						g = tonumber(value:sub(5, 6), 16) / 255
+						b = tonumber(value:sub(7, 8), 16) / 255
+					elseif value.GetRGB then
+						r, g, b = value:GetRGB()
+					end
+					if r and g and b then
 						db.colors[hand] = { r, g, b }
 						db.flatPalette = "custom"
 						ApplyAll()
 					end
-				end)
-			if ok and setting then
-				pcall(Settings.CreateColorSwatch, category, setting,
-					"Flat bar style: the " .. Addon.HAND_SETTING_NAME[hand] .. " fill color. Picking a color switches Bar colors to Custom.")
-			end
+				end
+			end)
+		if ok and setting then
+			pcall(Settings.CreateColorSwatch, category, setting,
+				"Flat bar style: the " .. Addon.HAND_SETTING_NAME[hand] .. " fill color. Picking a color switches Bar colors to Custom.")
 		end
 	end
 
