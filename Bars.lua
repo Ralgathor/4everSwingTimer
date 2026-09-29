@@ -565,7 +565,10 @@ end
 -- read shrunken on tall bars), clamped to sane bounds and capped so large
 -- fonts cannot collide across narrow bars.
 local function BarFontHeight()
-	return math.min(math.max(Addon.db.height * 0.66, 9), 18)
+	-- 0.66x keeps the default 18px bar at the original small-font size; the
+	-- cap was lowered 18 -> 14 after in-play feedback that 18px read far too
+	-- large on tall bars.
+	return math.min(math.max(Addon.db.height * 0.66, 9), 14)
 end
 
 function Bars:ApplyText()

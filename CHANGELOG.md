@@ -92,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never below 6px, text always fits inside the bar), and saved values under
   the old floor migrate up on load.
 - Text scaling: the hand label, time and delta font height now tracks the
-  bar height (0.66x, clamped to 9-18 px) instead of the fixed small font,
+  bar height (0.66x, clamped to 9-14 px - the 18px cap read far too large in play) instead of the fixed small font,
   which read shrunken on tall bars. The font stays the game's standard text
   face; the drag-hint overlay keeps the fixed small font as UI chrome.
 - Fixed the tick and glow positioning in drain mode: the pip was anchored to
