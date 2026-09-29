@@ -84,6 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0-4px sliver with the text floating over it. The floor is now 14px (fill
   never below 6px, text always fits inside the bar), and saved values under
   the old floor migrate up on load.
+- Text scaling: the hand label, time and delta font height now tracks the
+  bar height (0.66x, clamped to 9-18 px) instead of the fixed small font,
+  which read shrunken on tall bars. The font stays the game's standard text
+  face; the drag-hint overlay keeps the fixed small font as UI chrome.
 - Fixed the tick and glow positioning in drain mode: the pip was anchored to
   the fill texture's edge, and a parked drain bar sits at value 0, where the
   zero-width fill's edge left the tick and glow dangling off the bar. The tick

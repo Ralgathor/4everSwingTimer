@@ -15,6 +15,7 @@ local GetInventoryItemID = GetInventoryItemID
 local GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 local IsCurrentSpell = C_Spell and C_Spell.IsCurrentSpell
 local GetCVar = GetCVar
+local BASE_FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 -- Off-hand weapon check, two layers: the localized item-class name when
 -- GetItemClassInfo exists, plus the locale-independent numeric item classID
 -- (Weapon = 2) from GetItemInfo's extended returns as a fallback.
@@ -560,11 +561,22 @@ function Bars:SetParkedText(bar)
 	end
 end
 
+-- Text height tracks the bar height (in-play feedback: the fixed small font
+-- read shrunken on tall bars), clamped to sane bounds and capped so large
+-- fonts cannot collide across narrow bars.
+local function BarFontHeight()
+	return math.min(math.max(Addon.db.height * 0.66, 9), 18)
+end
+
 function Bars:ApplyText()
 	local db = Addon.db
+	local fontHeight = BarFontHeight()
 	for i = 1, #HAND_ORDER do
 		local hand = HAND_ORDER[i]
 		local bar = self.bars[hand]
+		bar.label:SetFont(BASE_FONT, fontHeight, "")
+		bar.time:SetFont(BASE_FONT, fontHeight, "")
+		bar.delta:SetFont(BASE_FONT, fontHeight, "")
 		bar.label:SetShown(db.showLabel)
 		bar.time:SetShown(db.showTime or db.showSpeed)
 		bar.delta:SetShown(db.showDelta and hand == "offhand")
