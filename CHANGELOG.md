@@ -125,3 +125,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own anchor (trailing the tick's left, no direction flip) and is hidden when
   it would extend outside the bar frame - e.g. the tick sitting at the left
   edge of an empty drain bar.
+- Interrupt outer glow from the cast bar source (the one gap in a full review
+  of the interrupted treatment): the native bar flashes the
+  cast_interrupt_outerglow atlas in ADD blend, atlas-sized at half scale and
+  centered on the bar regardless of bar size, fading over exactly 1.0 s
+  (InterruptGlowAnim). The interrupt treatment now layers the red fill tint
+  (native-consistent: the cast bar switches to the ui-castingbar-interrupted
+  atlas / CASTBAR_CLASSIC_RED), the red pip, the tuned shake and this outer
+  glow. The parry-haste and ranged-delay effects have no native analogs and
+  stand as designed.

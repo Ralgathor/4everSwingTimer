@@ -153,6 +153,7 @@ local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor S
 -- in play and rejected - the swing bar should keep its identity).
 local QUEUED_TINT = { 1.00, 0.82, 0.20 }
 local CASTBAR_PIP_RED_ATLAS = "ui-castingbar-pip-red"
+local CASTBAR_INTERRUPT_GLOW_ATLAS = "cast_interrupt_outerglow"
 local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
 -- The statusbar is inset within the bar frame (5px sides, 4px top/bottom):
 -- the cast art scales to the STATUSBAR's height, not the frame's.
@@ -351,6 +352,29 @@ local function CreateBar(hand)
 	bar.time = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	bar.time:SetPoint("RIGHT", bar.status, "RIGHT", -10, 0)
 	bar.time:SetText("0.0")
+
+	-- The cast bar's interrupted outer glow: the cast_interrupt_outerglow atlas
+	-- in ADD blend, atlas-sized at half scale (useAtlasSize + scale 0.5 in
+	-- CastingBarFrame.xml, fixed size regardless of bar size), centered on the
+	-- bar, flashed to full and faded to zero over exactly 1.0 s
+	-- (InterruptGlowAnim). Created after the text so it covers it like the
+	-- native glow does.
+	bar.interruptGlow = bar.status:CreateTexture(nil, "OVERLAY")
+	bar.interruptGlow:SetAtlas(CASTBAR_INTERRUPT_GLOW_ATLAS, true)
+	local glowW, glowH = bar.interruptGlow:GetSize()
+	bar.interruptGlow:SetSize(glowW * 0.5, glowH * 0.5)
+	bar.interruptGlow:SetPoint("CENTER", bar.status, "CENTER", 0, 0)
+	bar.interruptGlow:SetBlendMode("ADD")
+	bar.interruptGlow:SetAlpha(0)
+	bar.interruptGlow:Hide()
+	bar.interruptGlowFade = bar.interruptGlow:CreateAnimationGroup()
+	local interruptFade = bar.interruptGlowFade:CreateAnimation("Alpha")
+	interruptFade:SetFromAlpha(1)
+	interruptFade:SetToAlpha(0)
+	interruptFade:SetDuration(1.0)
+	bar.interruptGlowFade:SetScript("OnFinished", function()
+		bar.interruptGlow:Hide()
+	end)
 
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
 	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
@@ -914,6 +938,12 @@ function Bars:InterruptFeedback(bar)
 	local tickHeight = TickHeight()
 	if redH and redH > 0 then
 		bar.pip:SetSize(tickHeight * (redW / redH), tickHeight)
+	end
+	-- The cast bar's interrupted outer glow: flash to full, fade over 1.0 s.
+	if bar.interruptGlow and bar.interruptGlowFade then
+		bar.interruptGlow:Show()
+		bar.interruptGlowFade:Stop()
+		bar.interruptGlowFade:Play()
 	end
 	if bar.shake then
 		-- Blizzard gates the shake on the ShakeStrengthUI CVar; an absent CVar
