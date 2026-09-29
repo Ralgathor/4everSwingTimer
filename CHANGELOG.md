@@ -59,14 +59,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is absent). Blizzard's exact InterruptShakeAnim recipe (1-2 px jitter,
   ~0.3 s) was tested in play and read as too subtle on a peripheral swing bar,
   so the shake keeps the stronger decaying ~0.7 s motion.
-- The cast bar's pip and glow art (8x20 pip, 37x12 glow) is drawn for a 13 px
-  bar; its size here is automatic: proportional to the statusbar with a slight
-  overhang (1.1x, floored at 8 px), a rule calibrated against the in-play
-  choices made at both extremes of the height range (10 px at the default bar,
-  36 px at the maximum - both equal to their statusbar height x ~1.1; several
-  earlier fixed rules and a manual setting were tried and rejected). The glow
-  keeps the cast bar's proportions relative to the pip. Applies to the queued
-  state and the red interrupt pip.
+- The tick is the swing bar's own pip atlas everywhere - one identity across
+  the normal, queued and interrupted states - height-scaled automatically
+  (1.1x the statusbar, floored at 8 px) via the atlas's own aspect, per
+  in-play feedback: the queued state differentiates by the cast-bar yellow
+  fill and the glow, not by swapping tick art. The interrupted state keeps
+  the cast bar's red pip (ui-castingbar-pip-red), scaled the same way.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned

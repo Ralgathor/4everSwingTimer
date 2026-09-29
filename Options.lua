@@ -116,7 +116,7 @@ function Options:Init()
 				db.highlightQueued = value
 				Addon.Bars:SetHighlightQueued(value)
 			end),
-		"While a next-melee ability (Heroic Strike, Cleave, Raptor Strike, Maul) is queued, the main-hand bar's fill takes the cast bar's yellow and its tick swaps to the cast bar's spark art. Works in both bar styles.")
+		"While a next-melee ability (Heroic Strike, Cleave, Raptor Strike, Maul) is queued, the main-hand bar's fill takes the cast bar's yellow and the tick lights up with a glow. Works in both bar styles.")
 
 	Settings.CreateCheckbox(category,
 		ProxyBoolean(VAR_PREFIX .. "locked", "Locked", db.locked,

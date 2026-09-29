@@ -96,7 +96,6 @@ local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor S
 -- classic yellow as a vertex tint (the cast bar's fill atlas swap was tested
 -- in play and rejected - the swing bar should keep its identity).
 local QUEUED_TINT = { 1.00, 0.82, 0.20 }
-local CASTBAR_PIP_ATLAS = "ui-castingbar-pip"
 local CASTBAR_PIP_RED_ATLAS = "ui-castingbar-pip-red"
 local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
 -- The statusbar is inset within the bar frame (5px sides, 4px top/bottom):
@@ -107,11 +106,11 @@ local STATUS_INSET_Y = 4
 -- overhang (1.1x), calibrated against the in-play choices made at both
 -- extremes of the height range (10px at the default bar, 36px at the
 -- maximum - both equal to their statusbar height x ~1.1). No manual setting:
--- the tick follows the bar, with a floor so tiny bars still show one. The
--- glow keeps the cast bar's proportions relative to the pip
--- (37x12 glow vs 8x20 pip).
+-- the tick follows the bar, with a floor so tiny bars still show one. One
+-- tick identity everywhere: the swing bar's own pip atlas, height-scaled via
+-- its own aspect. The glow keeps the cast bar's proportions relative to the
+-- tick (37x12 glow vs 8x20 pip).
 local TICK_STATUSBAR_RATIO = 1.1
-local CASTBAR_PIP_RATIO_W = 8 / 20
 local CASTBAR_GLOW_RATIO_W = 37 / 20
 local CASTBAR_GLOW_RATIO_H = 12 / 20
 
@@ -120,10 +119,19 @@ local function TickHeight()
 	return math.max((Addon.db.height - STATUS_INSET_Y * 2) * TICK_STATUSBAR_RATIO, 8)
 end
 
-local function CastBarTickSize()
+local function GlowSize()
 	local tickHeight = TickHeight()
-	return tickHeight * CASTBAR_PIP_RATIO_W, tickHeight,
-		tickHeight * CASTBAR_GLOW_RATIO_W, tickHeight * CASTBAR_GLOW_RATIO_H
+	return tickHeight * CASTBAR_GLOW_RATIO_W, tickHeight * CASTBAR_GLOW_RATIO_H
+end
+
+-- The swing bar's own pip at the automatic tick height, aspect preserved.
+local function ApplyPipSize(bar)
+	bar.pip:SetAtlas(PIP_ATLAS, true)
+	local nativeW, nativeH = bar.pip:GetSize()
+	local tickHeight = TickHeight()
+	if nativeH and nativeH > 0 then
+		bar.pip:SetSize(tickHeight * (nativeW / nativeH), tickHeight)
+	end
 end
 local QUEUE_POLL = 0.20
 
@@ -430,25 +438,16 @@ function Bars:ApplyFillStyle(bar)
 	-- anchors coexist in WoW, and conflicting anchors collapse regions.
 	bar.queuedGlow:ClearAllPoints()
 	bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
+	-- One tick identity everywhere: the swing bar's own pip, height-scaled;
+	-- the queued state adds the fill tint and the glow, not a different tick.
+	ApplyPipSize(bar)
+	local glowW, glowH = GlowSize()
+	bar.queuedGlow:SetSize(glowW, glowH)
+	bar.pip:SetVertexColor(1, 1, 1)
 	if queued then
-		-- The cast bar's pip: ui-castingbar-pip, scaled to the bar height.
-		local pipW, pipH, glowW, glowH = CastBarTickSize()
-		bar.pip:SetAtlas(CASTBAR_PIP_ATLAS)
-		bar.pip:SetSize(pipW, pipH)
-		bar.queuedGlow:SetSize(glowW, glowH)
-		bar.pip:SetVertexColor(1, 1, 1)
 		bar.pip:Show()
 		bar.glowWanted = true
 	else
-		bar.pip:SetAtlas(PIP_ATLAS, true)
-		-- The native tick follows the Tick size setting too: read its atlas
-		-- aspect and scale the height to the same floor as the cast tick.
-		local nativeW, nativeH = bar.pip:GetSize()
-		local tickHeight = TickHeight()
-		if nativeH and nativeH > 0 then
-			bar.pip:SetSize(tickHeight * (nativeW / nativeH), tickHeight)
-		end
-		bar.pip:SetVertexColor(1, 1, 1)
 		bar.glowWanted = false
 		if db.skin == "native" then
 			bar.pip:Show()
@@ -814,10 +813,13 @@ end
 function Bars:InterruptFeedback(bar)
 	self:SetFillTint(bar, CLIP_TINT)
 	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas,
-	-- scaled to the bar height.
-	local pipW, pipH = CastBarTickSize()
-	bar.pip:SetAtlas(CASTBAR_PIP_RED_ATLAS)
-	bar.pip:SetSize(pipW, pipH)
+	-- height-scaled like the normal tick via its own aspect.
+	bar.pip:SetAtlas(CASTBAR_PIP_RED_ATLAS, true)
+	local redW, redH = bar.pip:GetSize()
+	local tickHeight = TickHeight()
+	if redH and redH > 0 then
+		bar.pip:SetSize(tickHeight * (redW / redH), tickHeight)
+	end
 	if bar.shake then
 		-- Blizzard gates the shake on the ShakeStrengthUI CVar; an absent CVar
 		-- (client without the setting) defaults to enabled.
