@@ -103,18 +103,21 @@ local CASTBAR_PIP_GLOW_ATLAS = "cast_standard_pipglow"
 -- the cast art scales to the STATUSBAR's height, not the frame's.
 local STATUS_INSET_X = 5
 local STATUS_INSET_Y = 4
--- Tick art sizing: an explicit setting (db.tickSize, the pip height in
--- pixels) - several in-play rounds could not converge on a fixed rule
--- (flush read too small, overhang and linear scaling read too big), so the
--- size is the user's call. The glow keeps the cast bar's proportions
--- relative to the pip (37x12 glow vs 8x20 pip).
+-- Tick art sizing: automatic, proportional to the statusbar with a slight
+-- overhang (1.1x), calibrated against the in-play choices made at both
+-- extremes of the height range (10px at the default bar, 36px at the
+-- maximum - both equal to their statusbar height x ~1.1). No manual setting:
+-- the tick follows the bar, with a floor so tiny bars still show one. The
+-- glow keeps the cast bar's proportions relative to the pip
+-- (37x12 glow vs 8x20 pip).
+local TICK_STATUSBAR_RATIO = 1.1
 local CASTBAR_PIP_RATIO_W = 8 / 20
 local CASTBAR_GLOW_RATIO_W = 37 / 20
 local CASTBAR_GLOW_RATIO_H = 12 / 20
 
--- Shared tick-height floor across all tick variants.
+-- Shared tick height across all tick variants.
 local function TickHeight()
-	return math.max(Addon.db.tickSize or 14, 4)
+	return math.max((Addon.db.height - STATUS_INSET_Y * 2) * TICK_STATUSBAR_RATIO, 8)
 end
 
 local function CastBarTickSize()
@@ -912,7 +915,7 @@ function Bars:Debug()
 	end
 	local db = Addon.db
 	print("|cff33ccff" .. Addon.name .. "|r debug: fill=" .. db.fill .. " skin=" .. db.skin
-		.. " tickSize=" .. tostring(db.tickSize) .. " scale=" .. tostring(db.scale))
+		.. " height=" .. tostring(db.height) .. " scale=" .. tostring(db.scale))
 	for i = 1, #HAND_ORDER do
 		local hand = HAND_ORDER[i]
 		local bar = self.bars[hand]

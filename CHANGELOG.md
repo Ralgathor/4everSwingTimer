@@ -60,11 +60,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ~0.3 s) was tested in play and read as too subtle on a peripheral swing bar,
   so the shake keeps the stronger decaying ~0.7 s motion.
 - The cast bar's pip and glow art (8x20 pip, 37x12 glow) is drawn for a 13 px
-  bar; its size here is an explicit setting, Tick size (8-40 px, default 14) -
-  several in-play rounds could not converge on a fixed rule (the cast bar's
-  own overhang and linear scaling read too big, statusbar-flush and a 16 px
-  cap read too small). The glow keeps the cast bar's proportions relative to
-  the pip. Applies to the queued state and the red interrupt pip.
+  bar; its size here is automatic: proportional to the statusbar with a slight
+  overhang (1.1x, floored at 8 px), a rule calibrated against the in-play
+  choices made at both extremes of the height range (10 px at the default bar,
+  36 px at the maximum - both equal to their statusbar height x ~1.1; several
+  earlier fixed rules and a manual setting were tried and rejected). The glow
+  keeps the cast bar's proportions relative to the pip. Applies to the queued
+  state and the red interrupt pip.
 - Fixed bars staying hidden in the Always visibility mode after entering the
   world: the initial visibility pass runs at PLAYER_LOGIN, before the client
   populates the player's inventory, so every weapon-presence read returned
