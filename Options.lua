@@ -117,14 +117,16 @@ function Options:Init()
 	Settings.CreateDropdown(category, palette, paletteOptions,
 		"Flat bar style colors. Preset resets the per-hand colors below to silver, blue and violet.")
 
-	-- Per-hand color swatches. This client's Settings.VarType has no Color
-	-- entry, so the swatch registration is guarded: if the client rejects a
-	-- color-valued proxy setting, the preset dropdown above still works.
+	-- Per-hand color swatches. The settings validator requires the declared
+	-- variable type to equal Lua's type() of the default value - a CreateColor
+	-- object is a "table" (this client's Settings.VarType has no Color entry,
+	-- and "color" is rejected). The swatch control works off the value being a
+	-- color object; registration stays guarded for any further surprises.
 	if CreateColor then
 		for i = 1, #Addon.HAND_ORDER do
 			local hand = Addon.HAND_ORDER[i]
 			local ok, setting = pcall(Settings.RegisterProxySetting, category,
-				VAR_PREFIX .. "color." .. hand, "color",
+				VAR_PREFIX .. "color." .. hand, "table",
 				Addon.HAND_SETTING_NAME[hand] .. " color",
 				CreateColor(db.colors[hand][1], db.colors[hand][2], db.colors[hand][3], 1),
 				function()

@@ -95,10 +95,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hand swallowed the queued yellow tint and the crimson ranged bar swallowed
   the interrupt red. The preset is now silver, blue and violet, so every
   effect reads on every bar, with per-hand custom color pickers in the
-  settings panel behind a Bar colors dropdown (Preset / Custom); the swatch
-  registration is guarded because this client's Settings.VarType has no
-  Color entry - if the client rejects color-valued settings, the preset
-  dropdown still applies.
+  settings panel behind a Bar colors dropdown (Preset / Custom); the color
+  settings are declared with variable type "table" (a CreateColor object is a
+  table, and the validator requires the declared type to equal type() of the
+  default value - "color" is rejected), with registration guarded in case
+  the client objects further.
 - Fixed the parry-haste feedback popping on ordinary swings: a stop counted as
   "in flight" with only 0.05 s remaining, but the engine's PLAYER_SWING
   anchor and the library's expiration timer race by up to a frame at every
