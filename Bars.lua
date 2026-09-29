@@ -444,15 +444,18 @@ function Bars:ApplyFillStyle(bar)
 	bar.queuedGlow:ClearAllPoints()
 	bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
 	-- One tick identity everywhere: the swing bar's own pip, height-scaled;
-	-- the queued state adds the fill tint and the glow, not a different tick.
+	-- the queued state adds the fill tint, the yellow tick and the glow, not
+	-- a different tick.
 	ApplyPipSize(bar)
 	local glowW, glowH = GlowSize()
 	bar.queuedGlow:SetSize(glowW, glowH)
-	bar.pip:SetVertexColor(1, 1, 1)
 	if queued then
+		-- The tick joins the queued color language.
+		bar.pip:SetVertexColor(QUEUED_TINT[1], QUEUED_TINT[2], QUEUED_TINT[3])
 		bar.pip:Show()
 		bar.glowWanted = true
 	else
+		bar.pip:SetVertexColor(1, 1, 1)
 		bar.glowWanted = false
 		if db.skin == "native" then
 			bar.pip:Show()

@@ -63,8 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the normal, queued and interrupted states - height-scaled automatically
   (1.1x the statusbar, floored at 8 px) via the atlas's own aspect, per
   in-play feedback: the queued state differentiates by the cast-bar yellow
-  fill and the glow, not by swapping tick art. The interrupted state keeps
-  the cast bar's red pip (ui-castingbar-pip-red), scaled the same way.
+  fill, the yellow-tinted tick and the glow, not by swapping tick art. The
+  interrupted state keeps the cast bar's red pip (ui-castingbar-pip-red),
+  scaled the same way.
 - The glow covers a little less than the full fill height (85%) instead of
   the cast bar's own 12px-on-13px band, which floated mid-fill with visible
   margins (in-play feedback; full fill height was tried and read too tall);
