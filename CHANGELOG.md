@@ -150,3 +150,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (Swing, Interrupt, Haste, Delay, Queued), each calling the same handlers as
   the test commands - visible effect verification while dragging, no slash
   typing needed.
+- The haste outer glow now uses the cast bar's interrupt outer-glow ATLAS,
+  desaturated and tinted green: no green glow art exists in the client, and
+  tinting the red art directly would multiply into mud - SetDesaturated
+  renders the halo art as grayscale, so the green vertex tint reads as pure
+  green shades. Same soft halo shape as the interrupt, same atlas sizing and
+  center anchor.

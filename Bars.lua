@@ -402,18 +402,20 @@ local function CreateBar(hand)
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
 	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
 	bar.shake = CreateShakeAnimation(bar)
-	-- Early-landing (parry haste) pop, and its outer glow adapted from the
-	-- cast bar's interrupt-glow pattern: an additive green halo extending
-	-- past the bar's frame (the interior portion reads as a wash over the
-	-- bar, like the native cast_interrupt_outerglow spans its bar), faded to
-	-- zero over the effect's duration. No green glow atlas exists, hence the
-	-- plain-color halo.
+	-- Early-landing (parry haste) pop and outer glow. The glow reuses the
+	-- cast bar's interrupt outer-glow ATLAS (no green glow art exists in the
+	-- client), DESATURATED so the green vertex tint renders it as pure green
+	-- shades instead of multiplying with the art's red - same soft halo shape
+	-- as the interrupt, properly green.
 	bar.pop = CreatePopAnimation(bar)
 	bar.hasteGlow = bar.status:CreateTexture(nil, "OVERLAY")
-	bar.hasteGlow:SetPoint("TOPLEFT", bar, "TOPLEFT", -6, 6)
-	bar.hasteGlow:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 6, -6)
-	bar.hasteGlow:SetColorTexture(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
+	bar.hasteGlow:SetAtlas(CASTBAR_INTERRUPT_GLOW_ATLAS, true)
+	local hasteGlowW, hasteGlowH = bar.hasteGlow:GetSize()
+	bar.hasteGlow:SetSize(hasteGlowW * 0.5, hasteGlowH * 0.5)
+	bar.hasteGlow:SetPoint("CENTER", bar.status, "CENTER", 0, 0)
 	bar.hasteGlow:SetBlendMode("ADD")
+	bar.hasteGlow:SetDesaturated(true)
+	bar.hasteGlow:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
 	bar.hasteGlow:SetAlpha(0)
 	bar.hasteGlow:Hide()
 	bar.hasteGlowFade = bar.hasteGlow:CreateAnimationGroup()
