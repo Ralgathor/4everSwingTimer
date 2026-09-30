@@ -172,6 +172,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   millisecond GetTime stamps into the SavedVariables table
   FourEverSwingTimerTrace, persisted by the client at logout or /reload.
   The beta client has no /chatlog and screenshot transcription has documented
-  digit noise; the trace file (WTF\Account\...\SavedVariables\4everSwingTimer.luaeverSwingTimer.lua)
+  digit noise; the trace file (WTF\Account\...\SavedVariables\4everSwingTimer.lua)
   can be read straight from disk - the parry-haste floor question and the
   early-band threshold both become resolvable from verbatim data.
