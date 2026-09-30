@@ -113,9 +113,11 @@ Bar behavior:
   swing.
 - Death: the library fires STOP per active hand on every client; bars follow, no
   special handling.
-- Parry haste: on classic flavors the library shortens the bar mid-swing; on
-  Forever it cannot (§8.10). The addon renders whatever the library reports — no
-  flavor branch needed.
+- Parry haste: the library shortens the bar mid-swing once it includes the
+  parry fix (UNIT_COMBAT, library section 8.10); the bar re-anchors at the
+  UPDATE and the green stack fires at the parry. Library builds without the
+  fix apply the haste only at the next swing - the addon's early-landing
+  detection covers those, so no flavor or version branch is needed.
 
 ### 4.2 Visibility model
 
@@ -191,7 +193,7 @@ Library-level facts the addon must present honestly, not hide:
 
 | Constraint (verified) | Addon behavior |
 |---|---|
-| Parry haste applies at the next swing, not mid-swing | Bar may overshoot after a player parry; self-corrects at next START. Documented in the FAQ; no visual apology in v1. |
+| Library builds without the parry fix apply parry haste at the next swing, not mid-swing | Bar may overshoot after a player parry on those builds; self-corrects at next START. With the fix the bar re-anchors mid-swing and the green stack fires at the parry. |
 | Speed changes never rescale an in-flight swing | UPDATE mid-swing is rare by design; when it fires (e.g. FAILED_QUIET reschedule) the bar follows it. |
 | Target tracking unsupported | No target UI at all (non-goal in v1). |
 | Secret values in combat | Library-owned concern; the addon never reads `UnitAttackSpeed`/`UnitRangedDamage` directly, so nothing to guard. |

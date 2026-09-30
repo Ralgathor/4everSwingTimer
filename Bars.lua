@@ -116,13 +116,15 @@ local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
 local SHAKE_STEP = 0.04
--- Early-landing (parry haste) feedback: the bar pops (scales up briefly)
--- with a green glow overlay and fill tint. The glow is a separate overlay
--- because the vertex tint modulates the native atlas fill's own colors -
--- green over amber reads muddy - while a plain overlay shows the intended
--- color regardless of skin. A STOP is followed by its START within one
--- library call, so the stop cannot be classified until a short grace period
--- shows whether a START follows and with which weapon speed.
+-- Parry-haste feedback: the bar pops (scales up briefly) with a green glow
+-- overlay and fill tint. With the library's parry fix (ApplyParryHaste) the
+-- stack fires in real time off the mid-swing melee UPDATE; on library builds
+-- without it, the fallback infers the haste from an early landing - a STOP is
+-- followed by its START within one library call, so the stop cannot be
+-- classified until a short grace period shows whether a START follows and with
+-- which weapon speed. The glow is a separate overlay because the vertex tint
+-- modulates the native atlas fill's own colors - green over amber reads muddy
+-- - while a plain overlay shows the intended color regardless of skin.
 local HASTE_TINT = { 0.30, 1.00, 0.40 }
 local HASTE_GLOW = { 0.25, 1.00, 0.35 }
 local HASTE_GLOW_ALPHA = 0.5
@@ -871,10 +873,11 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 			local sameSpeed = speedAtStop and speed and math.abs(speed - speedAtStop) <= math.max(speedAtStop * 0.02, 0.01)
 			if sameSpeed then
 				-- Early landing with the same weapon: the engine shortened the
-				-- swing mid-flight. On WoW: Forever that is parry haste (no
-				-- addon-facing parry API exists; the library re-anchors and the
-				-- hastened swing simply lands early - a mid-swing haste proc
-				-- produces the same signature).
+				-- swing mid-flight. Library builds without the parry fix
+				-- re-anchor only at the next swing, so the hastened swing lands
+				-- early; a mid-swing haste proc produces the same signature. With
+				-- the fix the UPDATE fires the feedback before the landing and
+				-- this path stays quiet.
 				self:HasteFeedback(bar)
 		else
 				-- Different weapon speed: a weapon swap restart; the old swing
@@ -882,18 +885,31 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 				self:InterruptFeedback(bar)
 			end
 		end
-	elseif hand == "ranged" and bar.active then
-		-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
-		-- Auto Shot reschedule: the engine re-attempts the shot and the
-		-- library predicts the next landing at now + ~0.5 s (measured recasts
-		-- 0.43-0.56 s). Detect that signature directly - comparing the new
-		-- expiration against the old one misses fails early in the cast
-		-- window, where the reschedule lands close to the original time and
-		-- the push is below the threshold.
-		local recast = expirationTime - GetTime()
-		if recast > 0.3 and recast < 0.7 then
-			self:SetFillTint(bar, DELAY_TINT)
+	elseif hand == "ranged" then
+		if bar.active then
+			-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
+			-- Auto Shot reschedule: the engine re-attempts the shot and the
+			-- library predicts the next landing at now + ~0.5 s (measured recasts
+			-- 0.43-0.56 s). Detect that signature directly - comparing the new
+			-- expiration against the old one misses fails early in the cast
+			-- window, where the reschedule lands close to the original time and
+			-- the push is below the threshold.
+			local recast = expirationTime - GetTime()
+			if recast > 0.3 and recast < 0.7 then
+				self:SetFillTint(bar, DELAY_TINT)
+			end
 		end
+	elseif bar.active then
+		-- A mid-swing melee UPDATE is the library's parry haste: the library
+		-- (ApplyParryHaste) fires UNIT_SWING_TIMER_UPDATE at the player's
+		-- defensive parry with the same weapon speed and a shortened expiry, and
+		-- on WoW: Forever nothing else produces a melee UPDATE (the attack-speed
+		-- rescale is gated off there and the pause spell list is empty). The
+		-- green stack fires in real time at the parry; the early-landing
+		-- detection above remains the fallback for library builds without the
+		-- parry fix, where the hastened swing lands early and the stop-grace
+		-- logic classifies it.
+		self:HasteFeedback(bar)
 	end
 	bar.speed = speed
 	bar.expiration = expirationTime

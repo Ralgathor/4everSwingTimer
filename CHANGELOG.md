@@ -156,3 +156,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renders the halo art as grayscale, so the green vertex tint reads as pure
   green shades. Same soft halo shape as the interrupt, same atlas sizing and
   center anchor.
+- Parry-haste feedback now fires in real time at the parry when the embedded
+  library includes the parry fix (the library's ApplyParryHaste fires
+  UNIT_SWING_TIMER_UPDATE mid-swing with the same weapon speed and a
+  shortened expiry at the player's defensive parry - on WoW: Forever nothing
+  else produces a melee UPDATE): the green stack pops the moment the parry
+  shortens the bar, and the bar re-anchors to the hastened expiry. The
+  early-landing detection (an in-flight STOP followed by a same-speed START)
+  stays as the fallback for library builds without the fix (the pinned
+  2.2.0-beta2), where the hastened swing lands early and the stop-grace
+  logic classifies it; with the fix the landing is no longer early relative
+  to the updated bar, so the two paths never double-fire.
