@@ -97,6 +97,12 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 				ForeverSwingTimerDB.flatPalette = Addon.FLAT_PALETTE_DEFAULT
 			end
 			Addon.db = ForeverSwingTimerDB
+			-- The trace's recording flag persists in SavedVariables; reset it
+			-- on load so a stale true cannot desync the first toggle of a
+			-- session (the command always means "start recording" when fresh).
+			if FourEverSwingTimerTrace then
+				FourEverSwingTimerTrace.recording = false
+			end
 			Addon.Options:Init()
 		end
 	elseif event == "PLAYER_LOGIN" then
@@ -178,10 +184,27 @@ end
 
 -- Verbatim event trace (/4everswingtimer trace). The beta client has no
 -- /chatlog and screenshot transcription has documented digit noise; this
--- records PLAYER_SWING and UNIT_COMBAT into the SavedVariables table
--- FourEverSwingTimerTrace (written by the client at logout or /reload -
--- read the file in WTF\Account\...\SavedVariables straight from disk after
--- the session). One line per event: "EVENT GetTime arg1 arg2 ...".
+-- records raw engine events (PLAYER_SWING, UNIT_COMBAT, the player's
+-- spellcasts) and the library's applied timer updates into the SavedVariables
+-- table FourEverSwingTimerTrace, written by the client at logout or /reload
+-- (read the file in WTF\Account\...\SavedVariables straight from disk after
+-- the session). One line per event in dispatch order: "EVENT GetTime ...".
+-- Same-frame events share a GetTime stamp, and their file order is the
+-- engine's dispatch order.
+local function TraceRecord(prefix, ...)
+	local t = FourEverSwingTimerTrace
+	if not t or not t.recording then
+		return
+	end
+	local n = (t.n or 0) + 1
+	t.n = n
+	local parts = { prefix, string.format("%.3f", GetTime()) }
+	for i = 1, select("#", ...) do
+		parts[#parts + 1] = tostring((select(i, ...)))
+	end
+	t[n] = table.concat(parts, " ")
+end
+
 function Addon:ToggleTrace()
 	FourEverSwingTimerTrace = FourEverSwingTimerTrace or {}
 	local trace = FourEverSwingTimerTrace
@@ -190,29 +213,36 @@ function Addon:ToggleTrace()
 		self.traceFrame = CreateFrame("Frame")
 		self.traceFrame:RegisterEvent("PLAYER_SWING")
 		self.traceFrame:RegisterEvent("UNIT_COMBAT")
+		-- Player spellcasts: the engine holds a swing during a cast and resets
+		-- it at completion, so cast activity contextualizes every cycle anomaly.
+		self.traceFrame:RegisterUnitEvent("UNIT_SPELLCAST_START", "player")
+		self.traceFrame:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+		self.traceFrame:RegisterUnitEvent("UNIT_SPELLCAST_FAILED_QUIET", "player")
 		self.traceFrame:SetScript("OnEvent", function(_, event, ...)
-			local t = FourEverSwingTimerTrace
-			if not t or not t.recording then
-				return
-			end
-			local n = (t.n or 0) + 1
-			t.n = n
-			local parts = { event, string.format("%.3f", GetTime()) }
-			for i = 1, select("#", ...) do
-				parts[#parts + 1] = tostring((select(i, ...)))
-			end
-			t[n] = table.concat(parts, " ")
+			TraceRecord(event, ...)
 		end)
-		trace.buildNumber = GetBuildInfo and select(2, GetBuildInfo()) or nil
-		trace.build = GetBuildInfo and GetBuildInfo() or nil
 		if self.lib then
 			trace.weaponSpeed = (self.lib:SwingTimerInfo("mainhand"))
+			-- The library's applied model state (e.g. the parry-haste UPDATE)
+			-- for direct model-vs-engine comparison in the same file: the
+			-- UPDATE's expiry against the next PLAYER_SWING landing.
+			self.lib.RegisterCallback(self.traceFrame, "UNIT_SWING_TIMER_UPDATE", function(event, ...)
+				TraceRecord("LIB_" .. event, ...)
+			end)
 		end
+	end
+	if trace.recording then
+		trace.build = GetBuildInfo and GetBuildInfo() or nil
+		trace.buildNumber = GetBuildInfo and select(2, GetBuildInfo()) or nil
+		-- Session marker: GetTime resets each session, so anchor the trace to
+		-- wall-clock time; sessions in the file can be told apart.
+		TraceRecord("SESSION", trace.build, trace.buildNumber, date and date("%Y-%m-%d %H:%M:%S") or "?")
 	end
 	self:Print(trace.recording
 		and "Trace ON - recorded to SavedVariables (persists at logout or /reload)."
 		or "Trace OFF.")
 end
+
 
 SLASH_4EVERSWINGTIMER1 = "/4everswingtimer"
 SLASH_4EVERSWINGTIMER2 = "/everswing"

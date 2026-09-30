@@ -179,3 +179,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alongside the version string: the version alone reads "1.60.1" across every
   beta build, which masked which engine build a capture came from during the
   parry-haste rule investigation.
+- Trace hardening from the capture-logic review: the persisted recording flag now
+  resets at load (a stale true from a previous session would have made the first
+  /trace toggle silently OFF, losing a session); each toggle-on writes a SESSION
+  marker line with the client build and a wall-clock date (GetTime resets each
+  session, so sessions in the file were previously indistinguishable); the
+  trace now also records the player's spellcasts (START/SUCCEEDED/FAILED_QUIET
+  - the engine holds swings during casts and resets at completion, so cast
+  activity contextualizes cycle anomalies) and the library's
+  UNIT_SWING_TIMER_UPDATE (the applied model state, e.g. the parry haste, for
+  direct model-vs-engine comparison in the same file). Event order is unchanged
+  and already correct: one array-indexed line per event in dispatch order.
