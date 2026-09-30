@@ -175,3 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   digit noise; the trace file (WTF\Account\...\SavedVariables\4everSwingTimer.lua)
   can be read straight from disk - the parry-haste floor question and the
   early-band threshold both become resolvable from verbatim data.
+- The trace now also records the client build number (select(2, GetBuildInfo()))
+  alongside the version string: the version alone reads "1.60.1" across every
+  beta build, which masked which engine build a capture came from during the
+  parry-haste rule investigation.

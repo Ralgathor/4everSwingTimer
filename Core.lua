@@ -203,6 +203,7 @@ function Addon:ToggleTrace()
 			end
 			t[n] = table.concat(parts, " ")
 		end)
+		trace.buildNumber = GetBuildInfo and select(2, GetBuildInfo()) or nil
 		trace.build = GetBuildInfo and GetBuildInfo() or nil
 		if self.lib then
 			trace.weaponSpeed = (self.lib:SwingTimerInfo("mainhand"))
