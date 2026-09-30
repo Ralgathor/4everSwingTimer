@@ -176,6 +176,43 @@ end
 -- Slash commands: /4everswingtimer (alias /everswing)
 -- ---------------------------------------------------------------------------
 
+-- Verbatim event trace (/4everswingtimer trace). The beta client has no
+-- /chatlog and screenshot transcription has documented digit noise; this
+-- records PLAYER_SWING and UNIT_COMBAT into the SavedVariables table
+-- FourEverSwingTimerTrace (written by the client at logout or /reload -
+-- read the file in WTF\Account\...\SavedVariables straight from disk after
+-- the session). One line per event: "EVENT GetTime arg1 arg2 ...".
+function Addon:ToggleTrace()
+	FourEverSwingTimerTrace = FourEverSwingTimerTrace or {}
+	local trace = FourEverSwingTimerTrace
+	trace.recording = not trace.recording
+	if trace.recording and not self.traceFrame then
+		self.traceFrame = CreateFrame("Frame")
+		self.traceFrame:RegisterEvent("PLAYER_SWING")
+		self.traceFrame:RegisterEvent("UNIT_COMBAT")
+		self.traceFrame:SetScript("OnEvent", function(_, event, ...)
+			local t = FourEverSwingTimerTrace
+			if not t or not t.recording then
+				return
+			end
+			local n = (t.n or 0) + 1
+			t.n = n
+			local parts = { event, string.format("%.3f", GetTime()) }
+			for i = 1, select("#", ...) do
+				parts[#parts + 1] = tostring((select(i, ...)))
+			end
+			t[n] = table.concat(parts, " ")
+		end)
+		trace.build = GetBuildInfo and GetBuildInfo() or nil
+		if self.lib then
+			trace.weaponSpeed = (self.lib:SwingTimerInfo("mainhand"))
+		end
+	end
+	self:Print(trace.recording
+		and "Trace ON - recorded to SavedVariables (persists at logout or /reload)."
+		or "Trace OFF.")
+end
+
 SLASH_4EVERSWINGTIMER1 = "/4everswingtimer"
 SLASH_4EVERSWINGTIMER2 = "/everswing"
 
@@ -209,6 +246,8 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 		end
 	elseif command == "debug" then
 		Addon.Bars:Debug()
+	elseif command == "trace" then
+		Addon:ToggleTrace()
 	elseif command == "reset" then
 		local defaults = Addon.DEFAULTS
 		Addon.db.point = defaults.point
@@ -219,7 +258,7 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 		Addon.Bars:RestorePosition()
 		Addon:Print("Position reset.")
 	elseif command == "help" then
-		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), unlock, lock, test [interrupt|haste|delay|queued|effects], debug, reset, help")
+		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), unlock, lock, test [interrupt|haste|delay|queued|effects], debug, trace, reset, help")
 	else
 		Addon:Print("Unknown command: " .. command .. ". Try |cffdddddd/4everswingtimer help|r")
 	end

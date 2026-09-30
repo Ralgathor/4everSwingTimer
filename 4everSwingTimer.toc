@@ -3,7 +3,7 @@
 ## Title: 4everSwingTimer
 ## Notes: Swing timer bars for WoW: Forever - main-hand, off-hand and ranged, accurate between swings via LibClassicSwingTimerAPI.
 ## Author: Ralgathor
-## SavedVariables: ForeverSwingTimerDB
+## SavedVariables: ForeverSwingTimerDB, FourEverSwingTimerTrace
 ## OptionalDeps: LibClassicSwingTimerAPI
 
 Libs\LibStub\LibStub.lua

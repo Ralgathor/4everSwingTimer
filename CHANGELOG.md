@@ -167,3 +167,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2.2.0-beta2), where the hastened swing lands early and the stop-grace
   logic classifies it; with the fix the landing is no longer early relative
   to the updated bar, so the two paths never double-fire.
+- Verbatim event trace for the beta probes: /4everswingtimer trace records
+  PLAYER_SWING and UNIT_COMBAT (unit token, action, full payloads) with
+  millisecond GetTime stamps into the SavedVariables table
+  FourEverSwingTimerTrace, persisted by the client at logout or /reload.
+  The beta client has no /chatlog and screenshot transcription has documented
+  digit noise; the trace file (WTF\Account\...\SavedVariables\4everSwingTimer.luaeverSwingTimer.lua)
+  can be read straight from disk - the parry-haste floor question and the
+  early-band threshold both become resolvable from verbatim data.
