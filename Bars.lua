@@ -187,9 +187,11 @@ local function GlowSize()
 		math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4)
 end
 
--- The swing bar's own pip at the automatic tick height, aspect preserved.
-local function ApplyPipSize(bar)
-	bar.pip:SetAtlas(PIP_ATLAS, true)
+-- The pip at the automatic tick height, aspect preserved. Without an
+-- atlas argument this is the swing bar's own pip; the interrupt treatment
+-- passes the cast bar's red pip.
+local function ApplyPipSize(bar, atlas)
+	bar.pip:SetAtlas(atlas or PIP_ATLAS, true)
 	local nativeW, nativeH = bar.pip:GetSize()
 	local tickHeight = TickHeight()
 	if nativeH and nativeH > 0 then
@@ -321,6 +323,31 @@ local function CreatePopAnimation(bar)
 	return group
 end
 
+-- The cast bar's interrupt outer glow as a reusable overlay: the
+-- cast_interrupt_outerglow atlas in ADD blend, atlas-sized at half scale
+-- (useAtlasSize + scale 0.5 in CastingBarFrame.xml, fixed size regardless of
+-- bar size), centered on the bar; flashed to fromAlpha and faded to zero over
+-- fadeDuration, hidden when the fade finishes.
+local function CreateCenterGlow(bar, fromAlpha, fadeDuration)
+	local glow = bar.status:CreateTexture(nil, "OVERLAY")
+	glow:SetAtlas(CASTBAR_INTERRUPT_GLOW_ATLAS, true)
+	local width, height = glow:GetSize()
+	glow:SetSize(width * 0.5, height * 0.5)
+	glow:SetPoint("CENTER", bar.status, "CENTER", 0, 0)
+	glow:SetBlendMode("ADD")
+	glow:SetAlpha(0)
+	glow:Hide()
+	local fade = glow:CreateAnimationGroup()
+	local anim = fade:CreateAnimation("Alpha")
+	anim:SetFromAlpha(fromAlpha)
+	anim:SetToAlpha(0)
+	anim:SetDuration(fadeDuration)
+	fade:SetScript("OnFinished", function()
+		glow:Hide()
+	end)
+	return glow, fade
+end
+
 local function CreateBar(hand)
 	local bar = CreateFrame("Frame", "FourEverSwingTimerBar" .. hand, anchor)
 	bar.hand = hand
@@ -378,28 +405,10 @@ local function CreateBar(hand)
 	bar.time:SetPoint("RIGHT", bar.status, "RIGHT", -10, 0)
 	bar.time:SetText("0.0")
 
-	-- The cast bar's interrupted outer glow: the cast_interrupt_outerglow atlas
-	-- in ADD blend, atlas-sized at half scale (useAtlasSize + scale 0.5 in
-	-- CastingBarFrame.xml, fixed size regardless of bar size), centered on the
-	-- bar, flashed to full and faded to zero over exactly 1.0 s
-	-- (InterruptGlowAnim). Created after the text so it covers it like the
-	-- native glow does.
-	bar.interruptGlow = bar.status:CreateTexture(nil, "OVERLAY")
-	bar.interruptGlow:SetAtlas(CASTBAR_INTERRUPT_GLOW_ATLAS, true)
-	local glowW, glowH = bar.interruptGlow:GetSize()
-	bar.interruptGlow:SetSize(glowW * 0.5, glowH * 0.5)
-	bar.interruptGlow:SetPoint("CENTER", bar.status, "CENTER", 0, 0)
-	bar.interruptGlow:SetBlendMode("ADD")
-	bar.interruptGlow:SetAlpha(0)
-	bar.interruptGlow:Hide()
-	bar.interruptGlowFade = bar.interruptGlow:CreateAnimationGroup()
-	local interruptFade = bar.interruptGlowFade:CreateAnimation("Alpha")
-	interruptFade:SetFromAlpha(1)
-	interruptFade:SetToAlpha(0)
-	interruptFade:SetDuration(1.0)
-	bar.interruptGlowFade:SetScript("OnFinished", function()
-		bar.interruptGlow:Hide()
-	end)
+	-- The cast bar's interrupted outer glow, flashed to full and faded to
+	-- zero over exactly 1.0 s (InterruptGlowAnim). Created after the text so
+	-- it covers it like the native glow does.
+	bar.interruptGlow, bar.interruptGlowFade = CreateCenterGlow(bar, 1.0, 1.0)
 
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
 	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
@@ -410,24 +419,9 @@ local function CreateBar(hand)
 	-- shades instead of multiplying with the art's red - same soft halo shape
 	-- as the interrupt, properly green.
 	bar.pop = CreatePopAnimation(bar)
-	bar.hasteGlow = bar.status:CreateTexture(nil, "OVERLAY")
-	bar.hasteGlow:SetAtlas(CASTBAR_INTERRUPT_GLOW_ATLAS, true)
-	local hasteGlowW, hasteGlowH = bar.hasteGlow:GetSize()
-	bar.hasteGlow:SetSize(hasteGlowW * 0.5, hasteGlowH * 0.5)
-	bar.hasteGlow:SetPoint("CENTER", bar.status, "CENTER", 0, 0)
-	bar.hasteGlow:SetBlendMode("ADD")
+	bar.hasteGlow, bar.hasteGlowFade = CreateCenterGlow(bar, HASTE_GLOW_ALPHA, HASTE_GLOW_TIME)
 	bar.hasteGlow:SetDesaturated(true)
 	bar.hasteGlow:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
-	bar.hasteGlow:SetAlpha(0)
-	bar.hasteGlow:Hide()
-	bar.hasteGlowFade = bar.hasteGlow:CreateAnimationGroup()
-	local hasteFade = bar.hasteGlowFade:CreateAnimation("Alpha")
-	hasteFade:SetFromAlpha(HASTE_GLOW_ALPHA)
-	hasteFade:SetToAlpha(0)
-	hasteFade:SetDuration(HASTE_GLOW_TIME)
-	bar.hasteGlowFade:SetScript("OnFinished", function()
-		bar.hasteGlow:Hide()
-	end)
 
 	bar.active = false
 	bar.paused = false
@@ -508,7 +502,8 @@ function Bars:SetPaused(bar, paused)
 		texture:SetDesaturated(paused)
 	end
 	bar.status:SetAlpha(paused and 0.55 or 1.0)
-	bar.time:SetVertexColor(paused and 0.6 or 1.0, paused and 0.6 or 1.0, paused and 0.6 or 1.0)
+	local textDim = paused and 0.6 or 1.0
+	bar.time:SetVertexColor(textDim, textDim, textDim)
 end
 
 -- Position the tick manually, the way the cast bar positions its spark
@@ -991,12 +986,7 @@ function Bars:InterruptFeedback(bar)
 	self:SetFillTint(bar, CLIP_TINT)
 	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas,
 	-- height-scaled like the normal tick via its own aspect.
-	bar.pip:SetAtlas(CASTBAR_PIP_RED_ATLAS, true)
-	local redW, redH = bar.pip:GetSize()
-	local tickHeight = TickHeight()
-	if redH and redH > 0 then
-		bar.pip:SetSize(tickHeight * (redW / redH), tickHeight)
-	end
+	ApplyPipSize(bar, CASTBAR_PIP_RED_ATLAS)
 	-- The cast bar's interrupted outer glow: flash to full, fade over 1.0 s.
 	if bar.interruptGlow and bar.interruptGlowFade then
 		bar.interruptGlow:Show()

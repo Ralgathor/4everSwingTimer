@@ -72,6 +72,14 @@ Addon.DEFAULTS = DEFAULTS
 local frame = CreateFrame("Frame")
 Addon.frame = frame
 
+-- Refresh bar visibility after any state change that can affect it; a no-op
+-- before the bars exist (library missing or not yet enabled).
+local function RefreshBars()
+	if Addon.Bars then
+		Addon.Bars:UpdateVisibility()
+	end
+end
+
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("PLAYER_REGEN_DISABLED")
@@ -109,14 +117,10 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 		Addon:OnEnable()
 	elseif event == "PLAYER_REGEN_DISABLED" then
 		Addon.inCombat = true
-		if Addon.Bars then
-			Addon.Bars:UpdateVisibility()
-		end
+		RefreshBars()
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		Addon.inCombat = false
-		if Addon.Bars then
-			Addon.Bars:UpdateVisibility()
-		end
+		RefreshBars()
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		-- The initial visibility pass runs at PLAYER_LOGIN, when the client has
 		-- often not populated the player's inventory yet - every HasWeapon read
@@ -125,26 +129,18 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 		-- triggers a refresh - and on a FIRST login the equipment data is
 		-- still streaming even here, so retry shortly and let
 		-- UNIT_INVENTORY_CHANGED below catch the moment it arrives.
-		if Addon.Bars then
-			Addon.Bars:UpdateVisibility()
-			C_Timer.After(1.0, function()
-				if Addon.Bars then
-					Addon.Bars:UpdateVisibility()
-				end
-			end)
-		end
+		RefreshBars()
+		C_Timer.After(1.0, RefreshBars)
 	elseif event == "UNIT_INVENTORY_CHANGED" then
 		-- The signal that the client has populated or changed the player's
 		-- equipment; at first login this is when weapon data actually exists.
-		if arg1 == "player" and Addon.Bars then
-			Addon.Bars:UpdateVisibility()
+		if arg1 == "player" then
+			RefreshBars()
 		end
 	elseif event == "PLAYER_EQUIPMENT_CHANGED" then
 		-- Equipping a shield in the off hand (or swapping weapons) changes
 		-- whether a hand can swing; refresh bar visibility immediately.
-		if Addon.Bars then
-			Addon.Bars:UpdateVisibility()
-		end
+		RefreshBars()
 	end
 end)
 
@@ -222,7 +218,7 @@ function Addon:ToggleTrace()
 			TraceRecord(event, ...)
 		end)
 		if self.lib then
-			trace.weaponSpeed = (self.lib:SwingTimerInfo("mainhand"))
+			trace.weaponSpeed = self.lib:SwingTimerInfo("mainhand")
 			-- The library's applied model state (e.g. the parry-haste UPDATE)
 			-- for direct model-vs-engine comparison in the same file: the
 			-- UPDATE's expiry against the next PLAYER_SWING landing.
@@ -232,11 +228,10 @@ function Addon:ToggleTrace()
 		end
 	end
 	if trace.recording then
-		trace.build = GetBuildInfo and GetBuildInfo() or nil
-		trace.buildNumber = GetBuildInfo and select(2, GetBuildInfo()) or nil
+		trace.build, trace.buildNumber = GetBuildInfo()
 		-- Session marker: GetTime resets each session, so anchor the trace to
 		-- wall-clock time; sessions in the file can be told apart.
-		TraceRecord("SESSION", trace.build, trace.buildNumber, date and date("%Y-%m-%d %H:%M:%S") or "?")
+		TraceRecord("SESSION", trace.build, trace.buildNumber, date("%Y-%m-%d %H:%M:%S"))
 	end
 	self:Print(trace.recording
 		and "Trace ON - recorded to SavedVariables (persists at logout or /reload)."

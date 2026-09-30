@@ -38,8 +38,10 @@ local function ProxyBoolean(variable, name, defaultValue, getValue, setValue)
 		defaultValue, getValue, setValue)
 end
 
-local function ProxyNumber(variable, name, defaultValue, minValue, maxValue, rate, onSet)
-	return Settings.RegisterProxySetting(category, VAR_PREFIX .. variable, Settings.VarType.Number, name,
+-- Shared proxy body: reads and writes Addon.db[variable] directly so
+-- every change applies live without depending on commit timing.
+local function ProxyVariable(variable, varType, name, defaultValue, onSet)
+	return Settings.RegisterProxySetting(category, VAR_PREFIX .. variable, varType, name,
 		defaultValue,
 		function()
 			return Addon.db[variable]
@@ -52,24 +54,19 @@ local function ProxyNumber(variable, name, defaultValue, minValue, maxValue, rat
 		end)
 end
 
+-- Radio dropdown options from a list of { value, label, tooltip } entries.
+local function DropdownOptions(entries)
+	local container = Settings.CreateControlTextContainer()
+	for i = 1, #entries do
+		container:Add(entries[i].value, entries[i].label, entries[i].tooltip, Settings.ControlType.Radio)
+	end
+	return container:GetData()
+end
+
 local function ProxyString(variable, name, defaultValue, entries, onSet)
-	local setting = Settings.RegisterProxySetting(category, VAR_PREFIX .. variable, Settings.VarType.String, name,
-		defaultValue,
-		function()
-			return Addon.db[variable]
-		end,
-		function(value)
-			Addon.db[variable] = value
-			if onSet then
-				onSet(value)
-			end
-		end)
+	local setting = ProxyVariable(variable, Settings.VarType.String, name, defaultValue, onSet)
 	local function GetOptions()
-		local container = Settings.CreateControlTextContainer()
-		for i = 1, #entries do
-			container:Add(entries[i].value, entries[i].label, entries[i].tooltip, Settings.ControlType.Radio)
-		end
-		return container:GetData()
+		return DropdownOptions(entries)
 	end
 	return setting, GetOptions
 end
@@ -137,17 +134,17 @@ function Options:Init()
 		"Uncheck to drag the bars around. The unlock overlay has a Test bars button.")
 
 	-- Layout
-	local width = ProxyNumber("width", "Width", db.width, 120, 400, 10, ApplyAll)
+	local width = ProxyVariable("width", Settings.VarType.Number, "Width", db.width, ApplyAll)
 	Settings.CreateSlider(category, width, Settings.CreateSliderOptions(120, 400, 10), "Bar width in pixels.")
 
-	local height = ProxyNumber("height", "Height", db.height, 14, 40, 1, ApplyAll)
+	local height = ProxyVariable("height", Settings.VarType.Number, "Height", db.height, ApplyAll)
 	Settings.CreateSlider(category, height, Settings.CreateSliderOptions(14, 40, 1),
 		"Bar height in pixels. The minimum is 14: the fill is inset 4px top and bottom, and the text needs the remaining room.")
 
-	local gap = ProxyNumber("gap", "Spacing", db.gap, 0, 16, 1, ApplyAll)
+	local gap = ProxyVariable("gap", Settings.VarType.Number, "Spacing", db.gap, ApplyAll)
 	Settings.CreateSlider(category, gap, Settings.CreateSliderOptions(0, 16, 1), "Space between bars in pixels.")
 
-	local scale = ProxyNumber("scale", "Scale", db.scale, 0.5, 2.0, 0.05, ApplyAll)
+	local scale = ProxyVariable("scale", Settings.VarType.Number, "Scale", db.scale, ApplyAll)
 	Settings.CreateSlider(category, scale, Settings.CreateSliderOptions(0.5, 2.0, 0.05), "Overall bar scale.")
 
 	-- Text

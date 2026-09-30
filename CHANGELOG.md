@@ -43,3 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   number so captures can be read from disk and attributed to a build. Design
   decisions and the verification checklist: docs/SPEC.md.
 
+### Changed
+
+- Internal cleanup, no behavior change: deduplicated the bar-visibility
+  refresh in the event dispatch (Core.lua), extracted the shared center-glow
+  overlay and pip sizing in the bars (Bars.lua), and dropped the settings
+  proxy helper's unused slider-bounds arguments, which duplicated the bounds
+  already passed to CreateSliderOptions (Options.lua).
+
