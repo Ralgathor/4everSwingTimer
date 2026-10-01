@@ -440,8 +440,9 @@ local function CreateBar(hand)
 	-- Early-landing speed streak: the cast bar's pip-glow streak
 	-- (cast_standard_pipglow - its tail already trails left, the right shape
 	-- for rightward motion) desaturated to the haste green, fired from the
-	-- fill's leading edge past the bar's right end while fading out. The
-	-- anchor, size and travel are set at play time from the live fill edge.
+	-- fill's leading edge to the bar's right end while fading out, so the
+	-- whole flight stays inside the bar. The anchor, size and travel are set
+	-- at play time from the live fill edge.
 	bar.streak = bar.status:CreateTexture(nil, "OVERLAY")
 	bar.streak:SetAtlas(CASTBAR_PIP_GLOW_ATLAS, true)
 	bar.streak:SetDesaturated(true)
@@ -1020,7 +1021,9 @@ function Bars:HasteFeedback(bar)
 		local edge = bar.status:GetValue() * statusWidth
 		bar.streak:SetSize(math.max(statusWidth * 0.3, 40), math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4))
 		bar.streak:SetPoint("RIGHT", bar.status, "LEFT", edge, 0)
-		bar.streakShot:SetOffset(statusWidth - edge + bar.streak:GetWidth(), 0)
+		-- Travel ends with the streak's head at the bar's right edge - inside,
+		-- not past it: the burst must read as speed within the bar's frame.
+		bar.streakShot:SetOffset(statusWidth - edge, 0)
 		bar.streakFX:Stop()
 		bar.streak:Show()
 		bar.streakFX:Play()
