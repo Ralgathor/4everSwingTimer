@@ -1522,11 +1522,19 @@ function Bars:ApplyAll()
 	self:SetLocked(Addon.db.locked)
 	self:ApplyLayout()
 	-- Re-park inactive bars so a fill/drain switch is reflected immediately.
+	-- The pip follows the value here too: ApplySkin's UpdateTickPosition ran
+	-- before ApplyLayout sized the bar (statusWidth 0, early return) and
+	-- before this value change, so without repositioning the tick sits at
+	-- CreateBar's LEFT-edge anchor - a full parked fill-mode bar showing its
+	-- "ready" tick at the far left until the first swing's OnUpdate moves
+	-- it. SwingStop already pairs its parked value with UpdateTickPosition;
+	-- this is the same contract for the init path.
 	local parked = ParkedValue()
 	for i = 1, #HAND_ORDER do
 		local bar = self.bars[HAND_ORDER[i]]
 		if not bar.active then
 			bar.status:SetValue(parked)
+			self:UpdateTickPosition(bar)
 		end
 	end
 end

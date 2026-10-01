@@ -60,6 +60,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   race at a natural landing (whose STOP parks the bar long before the
   grace elapses). No interrupt feedback fires on the convergence; the bar
   simply reaches the parked state the missing STOP owed it.
+- The parked tick sat at the far left of the bar after a login or `/reload`
+  until the first swing. `ApplyAll` applied the parked fill value (full in
+  fill mode) but never repositioned the tick afterwards - the last
+  `UpdateTickPosition` ran inside `ApplySkin`, before `ApplyLayout` had
+  sized the bar (zero width, early return) and before the value change -
+  so the tick stayed at its creation-time LEFT-edge anchor instead of the
+  fill's edge at the "ready" position. `SwingStop` already paired its
+  parked value with a reposition, which is why a normally landed swing
+  looked right and only the fresh-login bar was wrong. `ApplyAll` now
+  repositions the tick for every bar it re-parks.
 
 ## [1.0.0-beta2] - 2026-10-01
 

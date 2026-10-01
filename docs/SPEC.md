@@ -250,6 +250,11 @@ Forever beta:
     "while swinging" visibility mode, no stuck tick at the fill's edge and
     no interrupt flash. A moving Auto Shot must still fire its amber delay
     burst at the re-anchor inside that window.
+14. Parked tick at login: log in (or `/reload`) without swinging - in fill
+    mode the parked bar sits at "ready" (full) with its tick at the fill's
+    right edge, not at the far left; in drain mode it sits empty with the
+    tick at the left, matching a normally landed swing's parked state. The
+    first swing must find the tick at the correct parked position.
 
 (Classic Era and retail 12.x checklist items were dropped with the Forever-only
 scope amendment.)
