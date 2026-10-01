@@ -10,7 +10,7 @@ That means the bars also show what happens *between* swings:
 
 - cast-completion swing resets (the bar turns red and shakes, like the
   game's interrupted cast bar, then restarts),
-- parry-hasted early landings and ranged haste procs (the bar pops with a green glow),
+- parry-hasted early landings and ranged haste procs (the bar pops with a teal glow),
 - queued next-melee abilities (Heroic Strike, Cleave, Raptor Strike, Maul) -
   the main-hand fill takes the cast bar's yellow and the tick lights up with
   a glow while one is queued (both bar styles),
@@ -64,7 +64,7 @@ You will get a one-time chat hint about this if the native bars are on.
 **The bar finished early after I parried an attack.** That is the parry-haste
 feedback: the engine shortened your swing mid-flight (no addon-facing parry API
 exists on WoW: Forever; a request is filed with Blizzard), the swing landed
-early and the bar popped with a green glow at the re-anchor. Before that pop
+early and the bar popped with a teal glow at the re-anchor. Before that pop
 the bar still showed the un-hasted time - the addon cannot see the parry
 itself, only the early landing, which is why the signal arrives when the swing
 lands. A mid-swing haste proc produces the same pop.

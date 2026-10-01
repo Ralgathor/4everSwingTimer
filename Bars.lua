@@ -46,7 +46,7 @@ local FLAT_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 -- effect color makes that effect invisible (the original gold main hand
 -- swallowed the queued yellow; crimson swallowed the interrupt red). Every
 -- palette is chosen for distance from the effect colors - yellow (queued),
--- red (interrupt), amber (delay), green (haste) - so the constraint is
+-- red (interrupt), amber (delay), teal (haste) - so the constraint is
 -- satisfied by construction rather than left to the user.
 local FLAT_PALETTES = {
 	silver = {
@@ -127,17 +127,23 @@ local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
 local SHAKE_STEP = 0.04
--- Parry-haste feedback: the bar pops (scales up briefly) with a green glow
+-- Parry-haste feedback: the bar pops (scales up briefly) with a teal glow
 -- overlay and fill tint. With the library's parry fix (ApplyParryHaste) the
 -- stack fires in real time off the mid-swing melee UPDATE; on library builds
 -- without it, the fallback infers the haste from an early landing - a STOP is
 -- followed by its START within one library call, so the stop cannot be
 -- classified until a short grace period shows whether a START follows and with
 -- which weapon speed. The glow is a separate overlay because the vertex tint
--- modulates the native atlas fill's own colors - green over amber reads muddy
+-- modulates the native atlas fill's own colors - teal over amber reads muddy
 -- - while a plain overlay shows the intended color regardless of skin.
-local HASTE_TINT = { 0.30, 1.00, 0.40 }
-local HASTE_GLOW = { 0.25, 1.00, 0.35 }
+-- The haste color is TEAL, not green: green reads as health in peripheral
+-- vision (heal text, health bars, absorbs) before the shape resolves, and
+-- the blue channel is what keeps the flash distinct from it; teal also
+-- keeps distance from the warm effect colors (red, amber, yellow) and from
+-- the curated palettes' blues on the off-hand and ranged bars where haste
+-- fires, biasing turquoise so the hue jump off those blues still reads.
+local HASTE_TINT = { 0.10, 0.95, 0.65 }
+local HASTE_GLOW = { 0.05, 0.90, 0.55 }
 local HASTE_GLOW_ALPHA = 0.5
 local HASTE_GLOW_TIME = 0.5
 local BURST_SCALE = 1.06
@@ -568,10 +574,10 @@ local function CreateBar(hand)
 	-- the same mechanism the 12.x casting bar uses (InterruptShakeAnim).
 	bar.shake = CreateShakeAnimation(bar)
 	-- Early-landing (parry haste) pop and outer glow. The glow reuses the
-	-- cast bar's interrupt outer-glow ATLAS (no green glow art exists in the
-	-- client), DESATURATED so the green vertex tint renders it as pure green
+	-- cast bar's interrupt outer-glow ATLAS (no teal glow art exists in the
+	-- client), DESATURATED so the teal vertex tint renders it as pure teal
 	-- shades instead of multiplying with the art's red - same soft halo shape
-	-- as the interrupt, properly green.
+	-- as the interrupt, properly teal.
 	-- Directional burst stretches. The haste pop lunges OUT from the fill's
 	-- trailing edge - LEFT-anchored in fill mode (bar.pop), RIGHT-anchored
 	-- in drain (bar.recoil) - thrusting the leading edge forward. The delay
@@ -1087,7 +1093,7 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 				self:DelayFeedback(bar)
 			elseif bar.expiration and expirationTime < bar.expiration then
 				-- A shortened landing outside the reschedule window: the
-				-- rescale case. The shot lands early - the same green pop
+				-- rescale case. The shot lands early - the same teal pop
 				-- the melee hands take for a parry or a melee haste proc.
 				-- The window keeps precedence (a rescale on a short
 				-- remaining swing can land inside it and reads as a
@@ -1102,7 +1108,7 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 		-- defensive parry with the same weapon speed and a shortened expiry, and
 		-- on WoW: Forever nothing else produces a melee UPDATE (the attack-speed
 		-- rescale is gated off there and the pause spell list is empty). The
-		-- green stack fires in real time at the parry; the early-landing
+		-- teal stack fires in real time at the parry; the early-landing
 		-- detection above remains the fallback for library builds without the
 		-- parry fix, where the hastened swing lands early and the stop-grace
 		-- logic classifies it.
@@ -1166,7 +1172,7 @@ end
 
 -- The interrupted-cast treatment (red tint + red pip + shake), shared by the
 -- clip event and in-flight stops.
--- The parry-haste treatment: fill tint, green spark, the forward burst
+-- The parry-haste treatment: fill tint, teal spark, the forward burst
 -- (rightward in fill mode, leftward in drain) and the outer glow. Shared by
 -- the early-landing detection and the test command, so the test path
 -- exercises exactly the combat code.

@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ranged dynamic-haste feedback: a mid-swing ranged
   `UNIT_SWING_TIMER_UPDATE` that shortens the shot's landing (a
   Rapid Fire-class rescale, via the library's dynamic-haste rescale) now
-  fires the green haste pop instead of silently re-anchoring. The
+  fires the teal haste pop instead of silently re-anchoring. The
   movement-reschedule window keeps precedence - a ~0.5 s recast still
   reads as the amber delay. The haste test preview accordingly covers the
   ranged bar too, its fake-swing morph nudged past the reschedule window
@@ -60,6 +60,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than a second, mirrored lunge. The amber streak still flies backward,
   the fill tint, spark and glow are unchanged, and the effect inverts with
   the fill mode exactly as before.
+- The haste feedback color is now teal (tint `0.10/0.95/0.65`, glow
+  `0.05/0.90/0.55`), previously green: green reads as health in peripheral
+  vision (heal text, health bars, absorbs) before the bar's shape resolves,
+  so a green pop could be misread as a heal gain; teal keeps the flash
+  distinct via its blue channel while staying far from the warm effect
+  colors (red, amber, yellow) and biased turquoise so the hue jump off the
+  curated palettes' blues on the off-hand and ranged bars still reads. The
+  fill tint, spark, streak, burst and halo all take the new color together.
 
 ### Fixed
 

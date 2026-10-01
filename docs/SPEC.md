@@ -115,12 +115,12 @@ Bar behavior:
   special handling.
 - Parry haste: the library shortens the bar mid-swing once it includes the
   parry fix (UNIT_COMBAT, library section 8.10); the bar re-anchors at the
-  UPDATE and the green stack fires at the parry. Library builds without the
+  UPDATE and the teal stack fires at the parry. Library builds without the
   fix apply the haste only at the next swing - the addon's early-landing
   detection covers those, so no flavor or version branch is needed.
 - Ranged dynamic haste: a successful dynamic-family cast (Rapid Fire-class)
   rescales the in-flight shot (library 2.2.0-beta3+); the ranged UPDATE's
-  shortened landing fires the same green stack. The movement-reschedule
+  shortened landing fires the same teal stack. The movement-reschedule
   window keeps precedence - a ~0.5 s recast still reads as the amber delay,
   so a rescale late in a short remaining swing can land inside it and read
   as a reschedule.
@@ -210,8 +210,8 @@ Library-level facts the addon must present honestly, not hide:
 
 | Constraint (verified) | Addon behavior |
 |---|---|
-| Library builds without the parry fix apply parry haste at the next swing, not mid-swing | Bar may overshoot after a player parry on those builds; self-corrects at next START. With the fix the bar re-anchors mid-swing and the green stack fires at the parry. |
-| Weapon-speed changes never rescale an in-flight swing (dynamic-haste rescales do, library beta3+, on successful dynamic-family casts) | UPDATE mid-swing is rare by design; the reschedule window classifies the ~0.5 s retry as the amber delay, a shortened landing outside it fires the green haste pop, and the bar follows the new expiry either way. |
+| Library builds without the parry fix apply parry haste at the next swing, not mid-swing | Bar may overshoot after a player parry on those builds; self-corrects at next START. With the fix the bar re-anchors mid-swing and the teal stack fires at the parry. |
+| Weapon-speed changes never rescale an in-flight swing (dynamic-haste rescales do, library beta3+, on successful dynamic-family casts) | UPDATE mid-swing is rare by design; the reschedule window classifies the ~0.5 s retry as the amber delay, a shortened landing outside it fires the teal haste pop, and the bar follows the new expiry either way. |
 | Target tracking unsupported | No target UI at all (non-goal in v1). |
 | Secret values in combat | Library-owned concern; the addon never reads `UnitAttackSpeed`/`UnitRangedDamage` directly, so nothing to guard. |
 | Off-hand dual-wield anchoring unverified in lib beta | The addon is the natural test rig: if OH never fires on a dual wielder, file upstream; the addon needs no change. |
@@ -227,7 +227,7 @@ Forever beta:
 3. Dual wield: both bars, correct labels, delta text optional field sane.
 4. Hunter: ranged bar per Auto Shot; strafe mid-shot reschedules once (UPDATE);
    no double-drain; a mid-swing Rapid Fire rescales the shot with the
-   green haste pop (the shortened landing outside the reschedule window).
+   teal haste pop (the shortened landing outside the reschedule window).
 5. Cast mid-swing (any reset spell, e.g. Flash of Light): CLIPPED flash + restart.
 6. Channel/pause-class spells: PAUSED tint, resume or STOP per library.
 7. Weapon swap mid-combat: current bar finishes, next START uses new speed.
@@ -239,7 +239,7 @@ Forever beta:
 11. Library missing/disabled: addon loads inert with its chat notice, no error.
 12. Effect previews out of combat: `test interrupt` restarts the fake swing
     (red flash, bar back at the top for a fresh duration), `test haste`
-    shortens the swings on all three hands (green flash, bars re-anchor
+    shortens the swings on all three hands (teal flash, bars re-anchor
     and park at the early landing), `test delay` replays the retry on the ranged bar only
     (amber flash at the swing's landing, bar completes, pulls back and
     lands ~0.5 s later), `test queued` lights mid-swing and clears when the
