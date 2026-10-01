@@ -102,6 +102,8 @@ local LIB_EVENTS = {
 	"UNIT_SWING_TIMER_STOP",
 	"UNIT_SWING_TIMER_DELTA",
 }
+-- Exported for Core.lua's event trace, which records all seven callbacks.
+Addon.LIB_EVENTS = LIB_EVENTS
 local TEST_SPEED = 2.0
 -- Interrupt feedback, modeled on the 12.x casting bar's interrupted treatment
 -- (InterruptShakeAnim + InterruptGlow): a clipped swing tints red and shakes;
@@ -749,6 +751,11 @@ function Bars:UpdateQueued()
 	if not bar then
 		return
 	end
+	if self.queuedTestActive then
+		-- A queued test preview owns the indicator until its timer clears
+		-- it; the poll would reset the fake state within QUEUE_POLL.
+		return
+	end
 	local queued = false
 	for i = 1, #QUEUED_SPELLS do
 		if IsCurrentSpell(QUEUED_SPELLS[i]) then
@@ -771,8 +778,10 @@ function Bars:SetHighlightQueued(enabled)
 		return
 	end
 	if not enabled then
-		-- Clear the indicator immediately; enabling needs no action - the
-		-- poll picks it up within QUEUE_POLL.
+		-- Clear the indicator immediately, including a running test
+		-- preview; enabling needs no action - the poll picks it up within
+		-- QUEUE_POLL.
+		self.queuedTestActive = false
 		bar.queued = false
 		self:ApplyFillStyle(bar)
 	end
@@ -997,6 +1006,10 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 	if not bar then
 		return
 	end
+	-- A swing start clears the fake-swing marker: a test morph may only
+	-- ever rewrite a swing the test machinery itself started, never a
+	-- swing the library restarted with live data.
+	bar.testSwing = nil
 	if not isUpdate then
 		local now = GetTime()
 		if bar.active and bar.expiration and bar.expiration > now + 0.05 then
@@ -1069,6 +1082,7 @@ function Bars:SwingStop(hand)
 	-- PLAYER_SWING anchor and the library's expiration timer (see
 	-- EARLY_LANDING_EPSILON) - a bare "anything remaining" check popped the
 	-- haste feedback on ordinary swings whenever the engine won the race.
+	bar.testSwing = nil
 	bar.stoppedInFlight = (bar.active and bar.expiration and bar.expiration > GetTime() + EARLY_LANDING_EPSILON) or nil
 	bar.stoppedAt = GetTime()
 	bar.speedAtStop = bar.speed
@@ -1208,88 +1222,277 @@ end
 -- Test mode and enable
 -- ---------------------------------------------------------------------------
 
+-- The fake TEST_SPEED swing shared by the test command and the effect
+-- previews: a swing on the requested hands (nil = every enabled hand), shown
+-- in every visibility mode (testing short-circuits UpdateVisibility), each
+-- hand stopped by its own timer at the swing's landing. Starting a hand
+-- again mid-preview restarts its swing and re-arms its stop.
+function Bars:StartTestSwing(hands)
+	local db = Addon.db
+	local now = GetTime()
+	self.testing = true
+	local swingHands = hands or HAND_ORDER
+	for i = 1, #swingHands do
+		local hand = swingHands[i]
+		if db.enabled[hand] then
+			self:SwingStart(hand, TEST_SPEED, now + TEST_SPEED)
+			self.bars[hand].testSwing = true
+			self:ArmTestStop(hand, TEST_SPEED)
+		end
+	end
+end
+
+-- Arms one hand's test-stop timer. The effect previews re-arm the morphed
+-- hand with the morphed swing's own duration, so every fake swing ends
+-- exactly on its natural landing - never an in-flight stop, which the
+-- stop-grace logic would classify as a cut swing and answer with a second,
+-- spurious flash. Per-hand timers also keep scoped previews independent:
+-- one preview's re-arm never strands another hand's swing.
+function Bars:ArmTestStop(hand, duration)
+	self.testTimers = self.testTimers or {}
+	local timers = self.testTimers
+	if timers[hand] then
+		timers[hand]:Cancel()
+	end
+	timers[hand] = C_Timer.NewTimer(duration, function()
+		timers[hand] = nil
+		self:FinishTestSwing(hand)
+	end)
+end
+
+-- One hand's fake swing landed: stop it. The testing state holds until the
+-- last fake swing is down - a scoped preview's other hands may still be
+-- mid-flight.
+function Bars:FinishTestSwing(hand)
+	if self.testTimers then
+		local pending = false
+		for i = 1, #HAND_ORDER do
+			if self.testTimers[HAND_ORDER[i]] then
+				pending = true
+				break
+			end
+		end
+		if not pending then
+			self.testTimers = nil
+			self.testing = false
+		end
+	end
+	self:SwingStop(hand)
+end
+
 function Bars:Test()
 	if not self.bars then
 		return
 	end
-	local db = Addon.db
-	local now = GetTime()
-	self.testing = true
-	for i = 1, #HAND_ORDER do
-		local hand = HAND_ORDER[i]
-		local bar = self.bars[hand]
-		if db.enabled[hand] then
-			self:SwingStart(hand, TEST_SPEED, now + TEST_SPEED)
-		end
-	end
-	if self.testTimer then
-		self.testTimer:Cancel()
-	end
-	self.testTimer = C_Timer.NewTimer(TEST_SPEED, function()
-		self.testing = false
-		for i = 1, #HAND_ORDER do
-			self:SwingStop(HAND_ORDER[i])
-		end
-	end)
+	self:StartTestSwing()
 end
 
 -- Effect test modes, so visual feedback changes can be verified without
--- waiting for combat events: each triggers the real treatment code path on
--- the enabled bars. Used by "/4everswingtimer test <effect>".
+-- waiting for combat events: each lands the real treatment on the enabled
+-- bars, in the swing state its real event produces. With no live swing on
+-- the effect's hands, the fake test swing starts first, scoped to the
+-- effect's own hands, and the effect lands through the real event
+-- signature: the interrupt restarts the swing (a cast reset), the haste
+-- shortens it (a parry UPDATE), the delay recasts it at the swing's own
+-- landing (a movement-cancel retry), the queued highlight rides it. With a
+-- swing already in flight, the effect morphs that swing the same way when
+-- it is the preview's own fake swing (bar.testSwing), and fires the plain
+-- treatment on a real one (combat) - test data never rewrites live state.
+-- Used by "/4everswingtimer test <effect>" and the overlay's effect
+-- buttons.
+-- The queued preview's fallback duration, used only when the effect fires on
+-- a bar the test does not own (a real combat swing); on the fake swing the
+-- queue clears at the swing's own landing (see FireTestEffect).
 local TEST_QUEUED_TIME = 3.0
+local TEST_EFFECT_OFFSET = 0.5
+-- Which hands each effect's preview swings and treats: a cast reset
+-- restarts the whole swing timer (all enabled hands, the default scope);
+-- parry haste is melee-only; the movement reschedule is a ranged signature;
+-- the queued highlight paints the main-hand bar.
+local TEST_EFFECT_HANDS = {
+	haste = { "mainhand", "offhand" },
+	delay = { "ranged" },
+	queued = { "mainhand" },
+}
+-- The parry-haste preview shortens the swing's remaining time by the
+-- classic 40%-of-weapon-speed cut (off TEST_SPEED), the same proportional
+-- shortening the library's ApplyParryHaste applies, so it fires through the
+-- same mid-swing UPDATE detection the real event takes.
+local TEST_HASTE_CUT = TEST_SPEED * 0.4
+-- The movement reschedule is a RETRY, not a mid-swing event: the ranged
+-- swing runs all the way to its landing, the shot cannot fire while the
+-- player moves, and the engine re-attempts it within ~0.5 s - that
+-- re-attempt's UPDATE is what the library reschedules on (measured recasts
+-- 0.43-0.56 s, after the original expiry). The delay preview therefore
+-- lands its effect at the fake swing's own landing, not mid-swing.
+local TEST_DELAY_RECAST = 0.5
+-- The delay effect is scheduled this much before the swing's expiry, so its
+-- re-armed stop replaces the swing's own stop timer instead of racing it.
+local TEST_DELAY_LEAD = 0.05
+-- The "all" sequence spaces the previews one swing apart, so every effect
+-- gets its own swing window instead of piling onto one bar state.
+local TEST_SEQUENCE_STEP = TEST_SPEED + 0.2
 
 function Bars:TestEffect(effect)
 	if not self.bars then
 		return
 	end
-	local db = Addon.db
-	local function ForEnabled(func)
-		for i = 1, #HAND_ORDER do
-			local hand = HAND_ORDER[i]
-			local bar = self.bars[hand]
-			if db.enabled[hand] then
-				func(bar)
-			end
-		end
-	end
-	if effect == "interrupt" then
-		ForEnabled(function(bar)
-			self:InterruptFeedback(bar)
-		end)
-	elseif effect == "haste" then
-		ForEnabled(function(bar)
-			self:HasteFeedback(bar)
-		end)
-	elseif effect == "delay" then
-		ForEnabled(function(bar)
-			self:DelayFeedback(bar)
-		end)
-	elseif effect == "queued" then
-		local bar = self.bars.mainhand
-		if db.enabled.mainhand and bar then
-			bar.queued = true
-			self:ApplyFillStyle(bar)
-			if self.queuedTestTimer then
-				self.queuedTestTimer:Cancel()
-			end
-			self.queuedTestTimer = C_Timer.NewTimer(TEST_QUEUED_TIME, function()
-				bar.queued = false
-				self:ApplyFillStyle(bar)
+	if effect == "all" then
+		local sequence = { "interrupt", "haste", "delay", "queued" }
+		for i = 1, #sequence do
+			C_Timer.After(TEST_SEQUENCE_STEP * (i - 1), function()
+				self:TestEffect(sequence[i])
 			end)
 		end
-	elseif effect == "all" then
-		self:TestEffect("interrupt")
-		C_Timer.After(1.5, function()
-			self:TestEffect("haste")
-		end)
-		C_Timer.After(3.0, function()
-			self:TestEffect("delay")
-		end)
-		C_Timer.After(4.5, function()
-			self:TestEffect("queued")
-		end)
-	else
+		return
+	end
+	if effect ~= "interrupt" and effect ~= "haste" and effect ~= "delay" and effect ~= "queued" then
 		Addon:Print("Unknown test effect: " .. tostring(effect))
+		return
+	end
+	local db = Addon.db
+	local scope = TEST_EFFECT_HANDS[effect] or HAND_ORDER
+	-- "Live" must mean genuinely in flight. A bar can sit active with a
+	-- landed swing right after a reload: the library emits or seeds swing
+	-- state at login whose landing never produces a STOP, so the bar reads
+	-- parked (in drain mode it sits at empty, indistinguishable from
+	-- parked) while active stays true. Counting that as live made the
+	-- first effect preview fire the plain treatment on the stale state
+	-- instead of starting the fake swing - until a plain Swing test
+	-- overwrote the stale bar, which is why the triggers appeared to work
+	-- only after a Swing test. The expiration check keeps
+	-- landed-but-unstopped bars on the parked path, whose fake swing
+	-- overwrites them cleanly (SwingStart classifies a past expiration as
+	-- no reset and just re-anchors).
+	local now = GetTime()
+	local live = false
+	for i = 1, #scope do
+		local hand = scope[i]
+		local bar = self.bars[hand]
+		if bar and db.enabled[hand] and bar.active and bar.expiration and bar.expiration > now then
+			live = true
+			break
+		end
+	end
+	if self.effectTestTimer then
+		self.effectTestTimer:Cancel()
+		self.effectTestTimer = nil
+	end
+	if not live then
+		-- Parked bars: give the preview a swing to land on, scoped to the
+		-- effect's own hands. The queued preview clears when its swing
+		-- lands - the landing swing consumes the queue (see
+		-- FireTestEffect).
+		self:StartTestSwing(scope)
+	end
+	local delay
+	if effect == "delay" and self.testing then
+		-- The retry lands at the swing's own landing: schedule the effect
+		-- just before the fresh or running fake ranged swing expires, so
+		-- the bar first completes, then pulls back to the recast. On a
+		-- real combat swing this branch is not taken (testing is false) and
+		-- the plain treatment fires below.
+		local bar = self.bars.ranged
+		delay = math.max((bar.expiration or (GetTime() + TEST_SPEED)) - GetTime() - TEST_DELAY_LEAD, 0.05)
+	elseif live then
+		-- A live swing takes the effect now: a real combat swing gets the
+		-- plain treatment; a previous preview's fake swing is morphed by
+		-- FireTestEffect exactly like the scheduled path below morphs the
+		-- fresh one.
+		self:FireTestEffect(effect)
+		return
+	else
+		delay = TEST_EFFECT_OFFSET
+	end
+	self.effectTestTimer = C_Timer.NewTimer(delay, function()
+		self.effectTestTimer = nil
+		self:FireTestEffect(effect)
+	end)
+end
+
+-- The treatments, landed on the bars' current state. On the fake test swing
+-- each effect reproduces its real event signature through the detection
+-- paths in SwingStart, so the bar state the preview shows is the state
+-- combat produces: the interrupt restarts the swing (START while still in
+-- flight), the haste shortens it (mid-swing UPDATE, same speed, earlier
+-- expiry), the delay recasts it at the swing's landing (ranged UPDATE
+-- inside the retry window). Each morphed hand's stop timer follows the
+-- morphed swing, ending its preview on the natural landing. Bars that are
+-- not the test's own fake swings (a real combat swing, or a parked bar)
+-- get the plain treatment instead - test data never rewrites live state.
+function Bars:FireTestEffect(effect)
+	local db = Addon.db
+	local now = GetTime()
+	local scope = TEST_EFFECT_HANDS[effect] or HAND_ORDER
+	for i = 1, #scope do
+		local hand = scope[i]
+		local bar = self.bars[hand]
+		if bar and db.enabled[hand] then
+			local fake = bar.testSwing and bar.active
+			if effect == "interrupt" then
+				if fake then
+					-- START while the swing is still in flight: the real
+					-- cast-reset signature. The detection fires the
+					-- treatment and the bar restarts from the top with a
+					-- fresh full swing.
+					self:SwingStart(hand, TEST_SPEED, now + TEST_SPEED)
+					bar.testSwing = true
+					self:ArmTestStop(hand, TEST_SPEED)
+				else
+					self:InterruptFeedback(bar)
+				end
+			elseif effect == "haste" then
+				if fake then
+					-- Mid-swing UPDATE, same speed, shortened expiry: the
+					-- real parry-haste signature. The bar re-anchors at
+					-- the early landing and completes sooner.
+					local remaining = bar.expiration - now
+					local shortened = math.max(remaining - TEST_HASTE_CUT, 0.1)
+					self:SwingStart(hand, TEST_SPEED, now + shortened, true)
+					bar.testSwing = true
+					self:ArmTestStop(hand, shortened)
+				else
+					self:HasteFeedback(bar)
+				end
+			elseif effect == "delay" then
+				if fake then
+					-- Ranged UPDATE at the swing's landing with a ~0.5 s
+					-- recast: the real movement-cancel retry. The bar had
+					-- completed, and re-anchors at the re-attempt's
+					-- landing.
+					self:SwingStart(hand, TEST_SPEED, now + TEST_DELAY_RECAST, true)
+					bar.testSwing = true
+					self:ArmTestStop(hand, TEST_DELAY_RECAST)
+				else
+					self:DelayFeedback(bar)
+				end
+			elseif effect == "queued" then
+				bar.queued = true
+				-- Hold the poll off for the preview's duration (see
+				-- UpdateQueued).
+				self.queuedTestActive = true
+				self:ApplyFillStyle(bar)
+				if self.queuedTestTimer then
+					self.queuedTestTimer:Cancel()
+				end
+				-- The queue is consumed by the landing swing: a real
+				-- queued next-melee ability goes off with the swing that
+				-- consumes it, and the poll flips within QUEUE_POLL of that
+				-- landing. So the preview clears the fake queue at the fake
+				-- swing's own landing instead of outliving it parked (which
+				-- read as a frozen bar that later fades).
+				local remaining = TEST_QUEUED_TIME
+				if fake and bar.expiration then
+					remaining = math.max(bar.expiration - now, 0.05)
+				end
+				self.queuedTestTimer = C_Timer.NewTimer(remaining, function()
+					self.queuedTestActive = false
+					self.queuedTestTimer = nil
+					bar.queued = false
+					self:ApplyFillStyle(bar)
+				end)
+			end
+		end
 	end
 end
 

@@ -7,7 +7,7 @@ Guidance for AI coding agents working in this repository.
 4everSwingTimer is a standalone addon for **WoW: Forever only** (interface
 16000+, currently `## Interface: 16001`) that renders the player's swing timers
 as bars. All swing state comes from **LibClassicSwingTimerAPI** (embedded via
-`.pkgmeta` externals, currently pinned to tag `v2.2.0-beta2`, LibStub MINOR 34
+`.pkgmeta` externals, currently pinned to tag `v2.2.0-beta3`, LibStub MINOR 34
 — bump `REQUIRED_LIB_MINOR` in `Core.lua` when the library releases).
 
 The addon deliberately holds **no swing math**: it consumes the library's

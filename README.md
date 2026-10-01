@@ -42,7 +42,7 @@ read).
 | `/4everswingtimer` (alias `/everswing`) | open settings, or run a subcommand |
 | `... unlock` / `... lock` | show the drag overlay / lock the bars |
 | `/4everswingtimer test` | animate a fake 2.0s swing on all enabled bars |
-| `... test interrupt` / `haste` / `delay` / `queued` | trigger any effect on demand |
+| `... test interrupt` / `haste` / `delay` / `queued` | trigger any effect on demand (replayed on a fake swing when none is running) |
 | `... test effects` | play all effects in sequence |
 | `... reset` | reset the bar position |
 

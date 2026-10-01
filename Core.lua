@@ -219,12 +219,15 @@ function Addon:ToggleTrace()
 		end)
 		if self.lib then
 			trace.weaponSpeed = self.lib:SwingTimerInfo("mainhand")
-			-- The library's applied model state (e.g. the parry-haste UPDATE)
-			-- for direct model-vs-engine comparison in the same file: the
-			-- UPDATE's expiry against the next PLAYER_SWING landing.
-			self.lib.RegisterCallback(self.traceFrame, "UNIT_SWING_TIMER_UPDATE", function(event, ...)
-				TraceRecord("LIB_" .. event, ...)
-			end)
+			-- All seven library callbacks, not just UPDATE: a full session's
+			-- library behavior is needed for model-vs-engine comparison -
+			-- e.g. a START or seeded info at login whose landing never
+			-- produces a STOP (the stale-swing upstream report).
+			for i = 1, #Addon.LIB_EVENTS do
+				self.lib.RegisterCallback(self.traceFrame, Addon.LIB_EVENTS[i], function(event, ...)
+					TraceRecord("LIB_" .. event, ...)
+					end)
+				end
 		end
 	end
 	if trace.recording then

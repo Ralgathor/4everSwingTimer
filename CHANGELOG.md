@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The addon now ships an icon: `Textures/icon.png` (the logo's icon variant),
+  referenced from the TOC's new `## IconTexture`, so the addon list and the
+  Settings AddOns tab show the project logo instead of a blank tile. The
+  logo sources remain in `docs/`, which is not shipped.
+
+### Changed
+
+- Effect test previews (`/4everswingtimer test interrupt|haste|delay|queued`
+  and the unlocked overlay's effect buttons) now reproduce the full event
+  signature on a fake swing instead of painting the treatment on the bars'
+  current state. With no swing in flight the same fake 2.0 s swing as the
+  plain test command starts first, scoped to the effect's own hands, and the
+  effect lands through the real detection paths: the interrupt restarts the
+  swing mid-flight like a cast reset, the haste shortens the melee swings
+  like the parry UPDATE (the bar re-anchors at the early landing), the delay
+  replays the movement-cancel retry at the ranged swing's own landing - the
+  bar completes, cannot fire, pulls back and lands ~0.5 s later - and the
+  queued highlight rides a swinging main-hand bar until the swing lands and
+  consumes it. On a live combat swing the plain treatment fires, as before -
+  test data never rewrites live state. The queued-state poll no longer resets
+  the fake preview within 0.2 s - it is held off until the preview clears -
+  and `test effects` spaces the four previews one swing apart. Also fixed
+  the first effect trigger after a reload: a bar the library leaves active
+  with a landed swing at login no longer reads as a live swing, so the
+  preview starts its fake swing over the stale state instead of firing the
+  plain treatment on it (previously the effect triggers only worked after a
+  plain Swing test had overwritten the stale bar).
+- The event trace (`/4everswingtimer trace`) now records all seven
+  `UNIT_SWING_TIMER_*` callbacks instead of only UPDATE, so a full session's
+  library behavior is capturable from the SavedVariables trace file - e.g. a
+  START or seeded info at login whose landing never produces a STOP. The
+  upstream report for that library issue and the record of its library-side
+  resolution (fixed by a parked login seed, riding the library's unreleased
+  LibStub MINOR 35) both live in `docs/` (not shipped).
+
 ## [1.0.0-beta2] - 2026-10-01
 
 ### Changed

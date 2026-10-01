@@ -150,6 +150,16 @@ wielders are the only audience; keep it one font string, no alignment tooling.
   DB global is accessed via a name that is.
 - "Test bars" button: animates a fake 2.0s swing on all three bars for layout work
   without combat.
+- Effect previews (`test interrupt|haste|delay|queued`, overlay effect buttons):
+  each reproduces its real event signature on a fake swing scoped to the
+  effect's hands - the interrupt restarts the swing (cast reset), the haste
+  shortens the melee swings (parry UPDATE, early landing), the delay replays
+  the movement-cancel retry at the ranged swing's landing (the bar
+  completes, cannot fire, pulls back ~0.5 s and lands at the retry), the
+  queued highlight rides a swinging main-hand bar and clears when the swing
+  lands - the landing swing consumes the queue (the queued-state poll is
+  held off while it runs). On a live swing the plain treatment fires
+  directly; test data never rewrites live state.
 
 ### 4.5 Coexistence with the native swing timer
 
@@ -219,6 +229,19 @@ Forever beta:
 10. Options: every toggle applies live; test-bars button works; reload keeps
     position and settings (SavedVariables).
 11. Library missing/disabled: addon loads inert with its chat notice, no error.
+12. Effect previews out of combat: `test interrupt` restarts the fake swing
+    (red flash, bar back at the top for a fresh duration), `test haste`
+    shortens the melee swings (green flash, bar re-anchors and parks at the
+    early landing), `test delay` replays the retry on the ranged bar only
+    (amber flash at the swing's landing, bar completes, pulls back and
+    lands ~0.5 s later), `test queued` lights mid-swing and clears when the
+    swing lands (the landing swing consumes the queue); mid-combat the
+    effects fire on the live bar without rewriting its state; `test
+    effects` plays one effect per swing window with no double feedback at
+    any swing's end. Repro the reload case: reload while a swing is in
+    flight, then trigger any effect before a Swing test - the preview must
+    still start its fake swing rather than firing on the stale
+    active-but-landed bar the library's login seeding can leave behind.
 
 (Classic Era and retail 12.x checklist items were dropped with the Forever-only
 scope amendment.)
