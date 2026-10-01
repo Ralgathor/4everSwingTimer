@@ -138,9 +138,9 @@ local HASTE_TINT = { 0.30, 1.00, 0.40 }
 local HASTE_GLOW = { 0.25, 1.00, 0.35 }
 local HASTE_GLOW_ALPHA = 0.5
 local HASTE_GLOW_TIME = 0.5
-local HASTE_LUNGE_SCALE = 1.06
-local HASTE_LUNGE_OUT = 0.06
-local HASTE_LUNGE_BACK = 0.20
+local BURST_SCALE = 1.06
+local BURST_OUT = 0.06
+local BURST_BACK = 0.20
 local STREAK_TIME = 0.25
 local STOP_GRACE = 0.10
 -- A swing stopping with less than this remaining is a natural completion,
@@ -392,15 +392,15 @@ end
 local function CreatePopAnimation(bar, origin)
 	local group = bar:CreateAnimationGroup()
 	local lunge = group:CreateAnimation("Scale")
-	lunge:SetScale(HASTE_LUNGE_SCALE, 1)
+	lunge:SetScale(BURST_SCALE, 1)
 	lunge:SetOrigin(origin, 0, 0)
-	lunge:SetDuration(HASTE_LUNGE_OUT)
+	lunge:SetDuration(BURST_OUT)
 	lunge:SetSmoothing("OUT")
 	lunge:SetOrder(1)
 	local settle = group:CreateAnimation("Scale")
-	settle:SetScale(1 / HASTE_LUNGE_SCALE, 1)
+	settle:SetScale(1 / BURST_SCALE, 1)
 	settle:SetOrigin(origin, 0, 0)
-	settle:SetDuration(HASTE_LUNGE_BACK)
+	settle:SetDuration(BURST_BACK)
 	settle:SetSmoothing("IN_OUT")
 	settle:SetOrder(2)
 	return group
@@ -435,6 +435,45 @@ local function CreateCenterGlow(bar, fromAlpha, fadeDuration)
 		glow:Hide()
 	end)
 	return glow, fade
+end
+
+-- The flight streak shared by the haste and delay bursts: the cast bar's
+-- pip-glow streak (cast_standard_pipglow), desaturated so the play-time
+-- vertex color fully controls the tint, with the OUT-eased translation and
+-- the fade on one animation group. MIRRORED horizontally for the leftward
+-- flight, so the bright end leads either direction. Returns the texture,
+-- its group and the translation anim; FireStreak sets anchor, size and
+-- travel at play time.
+local function CreateStreak(bar, mirrored)
+	local streak = bar.status:CreateTexture(nil, "OVERLAY")
+	streak:SetAtlas(CASTBAR_PIP_GLOW_ATLAS, true)
+	if mirrored then
+		local ulx, uly, llx, lly, urx, ury, lrx, lry = streak:GetTexCoord()
+		if lrx then
+			-- Eight-value texcoords (atlas textures): UL<->UR, LL<->LR.
+			streak:SetTexCoord(urx, ury, lrx, lry, ulx, uly, llx, lly)
+		else
+			-- Four-value form: ULx,ULy and LRx,LRy swap.
+			streak:SetTexCoord(llx, lly, ulx, uly)
+		end
+	end
+	streak:SetDesaturated(true)
+	streak:SetBlendMode("ADD")
+	streak:Hide()
+	local group = streak:CreateAnimationGroup()
+	local shot = group:CreateAnimation("Translation")
+	shot:SetDuration(STREAK_TIME)
+	shot:SetSmoothing("OUT")
+	shot:SetOrder(1)
+	local fade = group:CreateAnimation("Alpha")
+	fade:SetFromAlpha(0.9)
+	fade:SetToAlpha(0)
+	fade:SetDuration(STREAK_TIME)
+	fade:SetOrder(1)
+	group:SetScript("OnFinished", function()
+		streak:Hide()
+	end)
+	return streak, group, shot
 end
 
 local function CreateBar(hand)
@@ -517,64 +556,16 @@ local function CreateBar(hand)
 	bar.hasteGlow, bar.hasteGlowFade = CreateCenterGlow(bar, HASTE_GLOW_ALPHA, HASTE_GLOW_TIME)
 	bar.hasteGlow:SetDesaturated(true)
 	bar.hasteGlow:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
-	-- Rightward flight streak: the cast bar's pip-glow streak
-	-- (cast_standard_pipglow - its tail already trails left, the right shape
-	-- for rightward motion), desaturated so the play-time vertex color fully
-	-- controls the tint (green for haste, amber for a drain-mode delay). The
-	-- anchor, size and travel are set at play time from the live fill edge.
-	bar.streak = bar.status:CreateTexture(nil, "OVERLAY")
-	bar.streak:SetAtlas(CASTBAR_PIP_GLOW_ATLAS, true)
-	bar.streak:SetDesaturated(true)
-	bar.streak:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
-	bar.streak:SetBlendMode("ADD")
-	bar.streak:Hide()
-	bar.streakFX = bar.streak:CreateAnimationGroup()
-	bar.streakShot = bar.streakFX:CreateAnimation("Translation")
-	bar.streakShot:SetDuration(STREAK_TIME)
-	bar.streakShot:SetSmoothing("OUT")
-	bar.streakShot:SetOrder(1)
-	local streakFade = bar.streakFX:CreateAnimation("Alpha")
-	streakFade:SetFromAlpha(0.9)
-	streakFade:SetToAlpha(0)
-	streakFade:SetDuration(STREAK_TIME)
-	streakFade:SetOrder(1)
-	bar.streakFX:SetScript("OnFinished", function()
-		bar.streak:Hide()
-	end)
-	-- Leftward flight streak: the same texture MIRRORED horizontally (the
-	-- texcoords swap left and right) so its bright end leads the leftward
-	-- flight, desaturated for the play-time vertex color (amber for delay,
-	-- green for a drain-mode haste). The amber halo below is directionless.
+	-- The two flight streaks, one per direction: the rightward one plain
+	-- (its tail trails left, the right shape for rightward motion), the
+	-- leftward one mirrored so its bright end leads. FireBurst recolors and
+	-- fires the matching streak for the effect and fill mode.
+	bar.streak, bar.streakFX, bar.streakShot = CreateStreak(bar, false)
+	bar.delayStreak, bar.delayStreakFX, bar.delayStreakShot = CreateStreak(bar, true)
+	-- The delay halo, directionless like the haste halo.
 	bar.delayGlow, bar.delayGlowFade = CreateCenterGlow(bar, DELAY_GLOW_ALPHA, DELAY_GLOW_TIME)
 	bar.delayGlow:SetDesaturated(true)
 	bar.delayGlow:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
-	bar.delayStreak = bar.status:CreateTexture(nil, "OVERLAY")
-	bar.delayStreak:SetAtlas(CASTBAR_PIP_GLOW_ATLAS, true)
-	local ulx, uly, llx, lly, urx, ury, lrx, lry = bar.delayStreak:GetTexCoord()
-	if lrx then
-		-- Eight-value texcoords (atlas textures): UL<->UR, LL<->LR.
-		bar.delayStreak:SetTexCoord(urx, ury, lrx, lry, ulx, uly, llx, lly)
-	else
-		-- Four-value form: ULx,ULy and LRx,LRy swap.
-		bar.delayStreak:SetTexCoord(llx, lly, ulx, uly)
-	end
-	bar.delayStreak:SetDesaturated(true)
-	bar.delayStreak:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
-	bar.delayStreak:SetBlendMode("ADD")
-	bar.delayStreak:Hide()
-	bar.delayStreakFX = bar.delayStreak:CreateAnimationGroup()
-	bar.delayStreakShot = bar.delayStreakFX:CreateAnimation("Translation")
-	bar.delayStreakShot:SetDuration(STREAK_TIME)
-	bar.delayStreakShot:SetSmoothing("OUT")
-	bar.delayStreakShot:SetOrder(1)
-	local delayFade = bar.delayStreakFX:CreateAnimation("Alpha")
-	delayFade:SetFromAlpha(0.9)
-	delayFade:SetToAlpha(0)
-	delayFade:SetDuration(STREAK_TIME)
-	delayFade:SetOrder(1)
-	bar.delayStreakFX:SetScript("OnFinished", function()
-		bar.delayStreak:Hide()
-	end)
 
 	bar.active = false
 	bar.paused = false
@@ -1163,9 +1154,10 @@ function Bars:InterruptFeedback(bar)
 	-- height-scaled like the normal tick via its own aspect.
 	ApplyPipSize(bar, CASTBAR_PIP_RED_ATLAS)
 	-- The cast bar's interrupted outer glow: flash to full, fade over 1.0 s.
-	if bar.interruptGlow and bar.interruptGlowFade then
+	if bar.interruptGlow and bar.interruptGlowFade and not bar.interruptGlowFade:IsPlaying() then
+		-- Like the burst animations: a clip landing mid-fade lets the halo
+		-- finish instead of popping back to full alpha.
 		bar.interruptGlow:Show()
-		bar.interruptGlowFade:Stop()
 		bar.interruptGlowFade:Play()
 	end
 	if bar.shake then
