@@ -3,7 +3,7 @@ externals:
   Libs/CallbackHandler-1.0: https://repos.curseforge.com/wow/callbackhandler/trunk/CallbackHandler-1.0
   Libs/LibClassicSwingTimerAPI:
     url: https://github.com/Ralgathor/LibClassicSwingTimerAPI.git
-    tag: v2.2.0-beta2
+    tag: v2.2.0-beta3
 
 ignore:
   - README.md
