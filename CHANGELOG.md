@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The addon now ships an icon: `Textures/icon.png` (the logo's icon variant),
-  referenced from the TOC's new `## IconTexture`, so the addon list and the
-  Settings AddOns tab show the project logo instead of a blank tile. The
-  logo sources remain in `docs/`, which is not shipped.
+  referenced from the TOC's new `## IconTexture` in the full-path form
+  (`Interface\AddOns\4everSwingTimer\Textures\icon.png` - the relative
+  `Textures\icon.png` form did not resolve on the Forever beta client), so
+  the addon list and the Settings AddOns tab show the project logo instead
+  of a blank tile. The logo sources remain in `docs/`, which is not shipped.
 - Ranged dynamic-haste feedback: a mid-swing ranged
   `UNIT_SWING_TIMER_UPDATE` that shortens the shot's landing (a
   Rapid Fire-class rescale, via the library's dynamic-haste rescale) now
