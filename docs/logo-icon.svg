@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.35" r="0.9">
+      <stop offset="0" stop-color="#2c3345"/>
+      <stop offset="1" stop-color="#10131a"/>
+    </radialGradient>
+    <radialGradient id="pipGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.51"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="rounded">
+      <rect x="0" y="0" width="512" height="512" rx="112"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#rounded)">
+    <rect x="0" y="0" width="512" height="512" fill="url(#bg)"/>
+
+    <!-- Trademark wordmark spanning the bars' width; 48 px gap to the first
+         bar, 32 px between bars -->
+    <text x="83" y="168" font-family="Segoe UI, Arial, sans-serif" font-size="135" font-weight="700" textLength="352" lengthAdjust="spacingAndGlyphs" fill="#000000" fill-opacity="0.59">4ever</text>
+    <text x="80" y="165" font-family="Segoe UI, Arial, sans-serif" font-size="135" font-weight="700" textLength="352" lengthAdjust="spacingAndGlyphs"><tspan fill="#ffd133">4</tspan><tspan fill="#f2f5fa">ever</tspan></text>
+
+    <!-- Three swing bars in the default in-game flat palette (Silver, Blue, Violet) -->
+    <g>
+      <rect x="80" y="212" width="352" height="56" rx="14" fill="#343c4d" stroke="#4a546a" stroke-width="1.5"/>
+      <rect x="85" y="217" width="266.76" height="46" rx="9" fill="#ebebf2"/>
+      <ellipse cx="351.76" cy="240" rx="20" ry="34.5" fill="url(#pipGlow)"/>
+      <rect x="345.76" y="217" width="12" height="46" rx="5" fill="#ffffff"/>
+    </g>
+    <g>
+      <rect x="80" y="300" width="352" height="56" rx="14" fill="#343c4d" stroke="#4a546a" stroke-width="1.5"/>
+      <rect x="85" y="305" width="157.32" height="46" rx="9" fill="#5c99ff"/>
+      <ellipse cx="242.32" cy="328" rx="20" ry="34.5" fill="url(#pipGlow)"/>
+      <rect x="236.32" y="305" width="12" height="46" rx="5" fill="#ffffff"/>
+    </g>
+    <g>
+      <rect x="80" y="388" width="352" height="56" rx="14" fill="#343c4d" stroke="#4a546a" stroke-width="1.5"/>
+      <rect x="85" y="393" width="75.24" height="46" rx="9" fill="#b366e6"/>
+      <ellipse cx="160.24" cy="416" rx="20" ry="34.5" fill="url(#pipGlow)"/>
+      <rect x="154.24" y="393" width="12" height="46" rx="5" fill="#ffffff"/>
+    </g>
+  </g>
+
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="none" stroke="#5c6a8c" stroke-opacity="0.43" stroke-width="2.5"/>
+</svg>

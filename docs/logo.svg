@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.35" r="0.9">
+      <stop offset="0" stop-color="#2c3345"/>
+      <stop offset="1" stop-color="#10131a"/>
+    </radialGradient>
+    <radialGradient id="pipGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.51"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="textShadow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.47"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="rounded">
+      <rect x="0" y="0" width="512" height="512" rx="112"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#rounded)">
+    <rect x="0" y="0" width="512" height="512" fill="url(#bg)"/>
+
+    <!-- Three swing bars: main-hand, off-hand, ranged -->
+    <!-- Three swing bars in the default in-game flat palette (Silver, Blue, Violet) -->
+    <g>
+      <rect x="80" y="118" width="352" height="56" rx="14" fill="#343c4d" stroke="#4a546a" stroke-width="1.5"/>
+      <rect x="85" y="123" width="266.76" height="46" rx="9" fill="#ebebf2"/>
+      <ellipse cx="351.76" cy="146" rx="20" ry="34.5" fill="url(#pipGlow)"/>
+      <rect x="345.76" y="123" width="12" height="46" rx="5" fill="#ffffff"/>
+      <rect x="80" y="118" width="171" height="56" rx="14" fill="url(#textShadow)"/>
+      <text x="91.5" y="147.5" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#000000" fill-opacity="0.59">Main Hand</text>
+      <text x="90" y="146" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#ffffff">Main Hand</text>
+      <text x="421.5" y="147.5" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#000000" fill-opacity="0.59">1.1</text>
+      <text x="420" y="146" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#ffffff">1.1</text>
+    </g>
+    <g>
+      <rect x="80" y="206" width="352" height="56" rx="14" fill="#343c4d" stroke="#4a546a" stroke-width="1.5"/>
+      <rect x="85" y="211" width="157.32" height="46" rx="9" fill="#5c99ff"/>
+      <ellipse cx="242.32" cy="234" rx="20" ry="34.5" fill="url(#pipGlow)"/>
+      <rect x="236.32" y="211" width="12" height="46" rx="5" fill="#ffffff"/>
+      <rect x="80" y="206" width="171" height="56" rx="14" fill="url(#textShadow)"/>
+      <text x="91.5" y="235.5" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#000000" fill-opacity="0.59">Off Hand</text>
+      <text x="90" y="234" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#ffffff">Off Hand</text>
+      <text x="421.5" y="235.5" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#000000" fill-opacity="0.59">0.7</text>
+      <text x="420" y="234" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#ffffff">0.7</text>
+    </g>
+    <g>
+      <rect x="80" y="294" width="352" height="56" rx="14" fill="#343c4d" stroke="#4a546a" stroke-width="1.5"/>
+      <rect x="85" y="299" width="75.24" height="46" rx="9" fill="#b366e6"/>
+      <ellipse cx="160.24" cy="322" rx="20" ry="34.5" fill="url(#pipGlow)"/>
+      <rect x="154.24" y="299" width="12" height="46" rx="5" fill="#ffffff"/>
+      <rect x="80" y="294" width="171" height="56" rx="14" fill="url(#textShadow)"/>
+      <text x="91.5" y="323.5" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#000000" fill-opacity="0.59">Ranged</text>
+      <text x="90" y="322" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#ffffff">Ranged</text>
+      <text x="421.5" y="323.5" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#000000" fill-opacity="0.59">1.8</text>
+      <text x="420" y="322" text-anchor="end" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#ffffff">1.8</text>
+    </g>
+
+    <!-- Name lockup: the "4ever" contraction of Forever -->
+    <text x="256" y="425" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="68" font-weight="700"><tspan fill="#ffd133">4</tspan><tspan fill="#f2f5fa">ever</tspan></text>
+    <text x="256" y="465" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="5" fill="#ffd133" fill-opacity="0.92">SWING TIMER</text>
+  </g>
+
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="none" stroke="#5c6a8c" stroke-opacity="0.43" stroke-width="2.5"/>
+</svg>
