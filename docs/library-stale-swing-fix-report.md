@@ -16,8 +16,11 @@ manufactures a swing at login. The old seed set
 next real swing. The seed now lands parked
 (`expirationTime = lastSwing`), matching the `PLAYER_TARGET_CHANGED`
 seed that has always parked the target. No event, method, or signature
-changes; the fix is client-agnostic and rides LibStub MINOR 35 (beta3
-shipped MINOR 34; MINOR 35 is unreleased at the time of writing).
+changes; the fix is client-agnostic. Post-release correction: it shipped
+the same day as `v2.2.0-beta4`, which carries LibStub MINOR 36 - the
+pre-release trunk this report verified was MINOR 35, and the beta3 tag
+itself is MINOR 35 (the "beta3 shipped MINOR 34" claim below was the
+addon's stale AGENTS.md line, not the tag's content).
 
 ## Live verification (WoW: Forever beta, build 70124, 2026-10-01)
 
@@ -65,15 +68,15 @@ Conclusions, both captures:
 
 - **One convergence change, added after the live repro on the shipped
   build.** The `expirationTime > now` guard in `Bars:SeedFromLibrary`
-  kept parked seeds out (correct with MINOR 35), but on the shipped
-  MINOR 34 the login seed manufactures a synthetic in-flight swing whose
+  kept parked seeds out (correct with the fixed build), but on the shipped
+  pre-beta4 builds the login seed manufactures a synthetic in-flight swing whose
   expiration is in the future - the guard passes, the bar drains to its
   end and then sits stuck (tick at the fill's edge, 0.0 remaining, shown
   in "while swinging" mode) until the next real swing, repro'd in play.
   `Bars:OnUpdate` now parks a bar whose expiration has been in the past
   for over 1 s (STALE_LANDING_GRACE - sized above the ranged movement
   retry's ~0.5 s re-anchor window and the engine-vs-timer race at a
-  natural landing, so neither feedback path is disturbed). With MINOR 35
+  natural landing, so neither feedback path is disturbed). With beta4
   embedded the branch never triggers; keep it anyway.
 - **Keep the expiration-passed workaround** (the "live" gate in
   `Bars:TestEffect`, and the swing-visibility handling). It is a cheap,
@@ -81,14 +84,12 @@ Conclusions, both captures:
   path or client, and it predates this fix. Do not rip it out.
 - **Comments describing the old behavior** (`Bars:TestEffect`'s "a bar can
   sit active with a landed swing right after a reload" block,
-  `docs/SPEC.md`'s reload repro) describe the pre-fix library. Leave them
-  until the fixed library ships embedded; then reword to history in the
-  same pass as the repin.
-- **Packaging, once the library releases (MINOR 35+):** bump the
-  `.pkgmeta` external tag off `v2.2.0-beta3` and bump
-  `REQUIRED_LIB_MINOR` in `Core.lua` (currently 34). Note: this repo's
-  AGENTS.md still says the pin is `v2.2.0-beta2` — stale, the pkgmeta is
-  already at beta3; worth fixing in the same pass.
+  `docs/SPEC.md`'s reload repro) describe the pre-fix library. Done:
+  reworded to history in the beta4 repin pass (2026-10-01).
+- **Packaging (done 2026-10-01):** the `.pkgmeta` external tag is
+  `v2.2.0-beta4` and `REQUIRED_LIB_MINOR` in `Core.lua` is 36 - the release
+  took LibStub MINOR 36, one above the verified trunk's 35. The stale
+  AGENTS.md pin line was corrected in the same pass.
 - The local test install (`_classic_beta_`) runs the fixed MINOR 35 by
   hand-copy; users get the fix only via the consumer release above.
 

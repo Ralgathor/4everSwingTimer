@@ -249,10 +249,11 @@ Forever beta:
     any swing's end. Repro the reload case: reload while a swing is in
     flight, then trigger any effect before a Swing test - the preview must
     still start its fake swing rather than firing on the stale
-    active-but-landed bar the library's login seeding can leave behind.
-13. Stale landing convergence: with the shipped library build (whose login
-    seed manufactures an in-flight swing the engine can never complete),
-    reload mid-swing - the bar must drain to its end, hold briefly (the
+    active-but-landed bar that pre-beta4 library builds left behind.
+13. Stale landing convergence: with a library build older than 2.2.0-beta4
+    (whose login seed manufactured an in-flight swing the engine can never
+    complete; beta4 parks the seed, and the convergence stays as the
+    defense), reload mid-swing - the bar must drain to its end, hold briefly (the
     ranged movement retry needs that window), then park itself within ~1 s
     of the landing: parked fill position, parked text, hidden in the
     "while swinging" visibility mode, no stuck tick at the fill's edge and

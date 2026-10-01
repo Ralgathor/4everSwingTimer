@@ -165,11 +165,13 @@ local STOP_GRACE = 0.10
 -- above this threshold.
 local EARLY_LANDING_EPSILON = 0.2
 -- A swing whose expiration has been in the past for longer than this with
--- no STOP is landed, not in flight. The library seeds an active swing at
--- login whose landing the engine can never complete (auto-attack does not
--- survive a /reload), so no UNIT_SWING_TIMER_STOP ever fires - without a
--- convergence check the bar sits active at 0.0 with the tick parked at the
--- fill's edge until the next real swing. The grace outlasts the ranged
+-- no STOP is landed, not in flight. Library builds before v2.2.0-beta4
+-- seeded an active swing at login whose landing the engine could never
+-- complete (auto-attack does not survive a /reload), so no
+-- UNIT_SWING_TIMER_STOP ever fired and the bar sat active at 0.0 with the
+-- tick parked at the fill's edge until the next real swing; beta4 parks
+-- the seed, and this convergence remains the defense for any swing that
+-- ends without a STOP on any path or client. The grace outlasts the ranged
 -- movement retry - the engine re-attempts a moving Auto Shot ~0.5 s after
 -- the original expiry and the library's UPDATE then re-anchors the
 -- completed-but-active bar, firing the amber delay burst - and the
@@ -1057,11 +1059,12 @@ function Bars:OnUpdate()
 end
 
 -- The visibility-independent half of the stale-landing convergence: OnUpdate
--- only fires while the anchor is shown, but a login-seeded never-landing
--- swing exists precisely while it is hidden (first login, out of combat,
--- locked UI - no visible bar). This sweep runs off a C_Timer ticker (see
--- Enable) and parks the same stale swings regardless of visibility;
--- SwingStop does the parking, pairing value, tick and text.
+-- only fires while the anchor is shown, but a swing that landed without a
+-- STOP (library builds before v2.2.0-beta4 seeded exactly that at login)
+-- exists precisely while it is hidden - first login, out of combat, locked
+-- UI - no visible bar. This sweep runs off a C_Timer ticker (see Enable)
+-- and parks the same stale swings regardless of visibility; SwingStop does
+-- the parking, pairing value, tick and text.
 function Bars:SweepStaleLandings()
 	if not self.bars then
 		return
@@ -1452,18 +1455,17 @@ function Bars:TestEffect(effect)
 	end
 	local db = Addon.db
 	local scope = TEST_EFFECT_HANDS[effect] or HAND_ORDER
-	-- "Live" must mean genuinely in flight. A bar can sit active with a
-	-- landed swing right after a reload: the library emits or seeds swing
-	-- state at login whose landing never produces a STOP, so the bar reads
-	-- parked (in drain mode it sits at empty, indistinguishable from
-	-- parked) while active stays true. Counting that as live made the
-	-- first effect preview fire the plain treatment on the stale state
-	-- instead of starting the fake swing - until a plain Swing test
-	-- overwrote the stale bar, which is why the triggers appeared to work
-	-- only after a Swing test. The expiration check keeps
-	-- landed-but-unstopped bars on the parked path, whose fake swing
-	-- overwrites them cleanly (SwingStart classifies a past expiration as
-	-- no reset and just re-anchors).
+	-- "Live" must mean genuinely in flight. Library builds before
+	-- v2.2.0-beta4 left a bar active with a landed swing right after a
+	-- reload - the login seed manufactured an uncompletable swing, so the
+	-- bar read parked (in drain mode it sits at empty, indistinguishable
+	-- from parked) while active stayed true, and counting that as live
+	-- made the first effect preview fire the plain treatment on the stale
+	-- state instead of starting the fake swing. Beta4 parks the seed; the
+	-- expiration check remains the guard, keeping landed-but-unstopped
+	-- bars on the parked path, whose fake swing overwrites them cleanly
+	-- (SwingStart classifies a past expiration as no reset and just
+	-- re-anchors).
 	local now = GetTime()
 	local live = false
 	for i = 1, #scope do

@@ -8,8 +8,9 @@
 
 local ADDON_NAME = "4everSwingTimer"
 local LIB_MAJOR = "LibClassicSwingTimerAPI"
--- The Forever swing path shipped with the library's 2.2.0 beta line (MINOR 34).
-local REQUIRED_LIB_MINOR = 34
+-- The Forever swing path shipped with the library's 2.2.0 beta line; the
+-- embedded pin is v2.2.0-beta4 (LibStub MINOR 36, the parked login seed).
+local REQUIRED_LIB_MINOR = 36
 
 FourEverSwingTimer = {}
 local Addon = FourEverSwingTimer
@@ -226,8 +227,8 @@ function Addon:ToggleTrace()
 			for i = 1, #Addon.LIB_EVENTS do
 				self.lib.RegisterCallback(self.traceFrame, Addon.LIB_EVENTS[i], function(event, ...)
 					TraceRecord("LIB_" .. event, ...)
-					end)
-				end
+				end)
+			end
 		end
 	end
 	if trace.recording then

@@ -5,7 +5,7 @@ https://github.com/Ralgathor/LibClassicSwingTimerAPI/issues. Not shipped in
 the package (`docs/` is a packager ignore); this file is the copy-paste
 source and the record of what was reported and when.
 
-Resolution: fixed library-side 2026-10-01 (parked login seed, LibStub MINOR 35) and live-verified on the Forever beta in two login scenarios. See the library CHANGELOG [Unreleased] entry and the 4everSwingTimer repo docs/library-stale-swing-fix-report.md.
+Resolution: fixed library-side 2026-10-01 (parked login seed, released as v2.2.0-beta4 / LibStub MINOR 36) and live-verified on the Forever beta in two login scenarios. See the 4everSwingTimer repo docs/library-stale-swing-fix-report.md.
 
 Suggested title:
 

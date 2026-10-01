@@ -50,8 +50,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   library behavior is capturable from the SavedVariables trace file - e.g. a
   START or seeded info at login whose landing never produces a STOP. The
   upstream report for that library issue and the record of its library-side
-  resolution (fixed by a parked login seed, riding the library's unreleased
-  LibStub MINOR 35) both live in `docs/` (not shipped).
+  resolution (fixed by a parked login seed, released in the library's
+  v2.2.0-beta4) both live in `docs/` (not shipped).
+- Embedded LibClassicSwingTimerAPI bumped from v2.2.0-beta3 to v2.2.0-beta4
+  (LibStub MINOR 36; `REQUIRED_LIB_MINOR` follows): the library's stale
+  login swing - an in-flight seed at `PLAYER_ENTERING_WORLD` whose landing
+  the engine can never complete, the issue this addon reported
+  (`docs/upstream-stale-swing-report.md`) and live-verified fixed
+  (`docs/library-stale-swing-fix-report.md`) - now parks instead, so no
+  consumer ever receives the uncompletable swing. This addon's own
+  stale-landing convergence stays as the defense for any swing that ends
+  without a STOP on any path or client.
 - The delay burst is now the haste pop's anti-version. It previously
   mirrored the pop - anchoring the bar's right side and kicking its left
   edge out, which read as a leftward lunge; it now keeps the haste pop's
