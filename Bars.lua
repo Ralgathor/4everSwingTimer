@@ -211,12 +211,11 @@ local function ApplyPipSize(bar, atlas)
 	end
 end
 
--- Fires a contained streak flight across the fill. Forward (haste): the
--- head launches at the fill's leading edge and travels to the bar's right
--- end. Reverse (delay): the mirrored streak launches at the leading edge and
--- travels to the left end - the exact inverse. In both directions the launch
--- shifts inside when the fill edge is too close to the near end for the tail
--- to fit, so the whole flight stays inside the bar.
+-- Fires a contained streak flight across the fill: rightward flights use the
+-- plain streak, leftward flights the mirrored one, and in both directions
+-- the head launches at the fill's leading edge and travels to the far end.
+-- The launch shifts inside when the fill edge is too close to the near end
+-- for the tail to fit, so the whole flight stays inside the bar.
 local function FireStreak(bar, streak, shot, group, reverse)
 	if group:IsPlaying() then
 		-- A flight is already running: restarting would snap it back to its
@@ -245,6 +244,36 @@ local function FireStreak(bar, streak, shot, group, reverse)
 	group:Stop()
 	streak:Show()
 	group:Play()
+end
+
+-- "Forward" is the direction the fill's leading edge travels as the swing
+-- progresses - rightward in fill mode, leftward in drain mode. Haste pulls
+-- the landing forward, delay pushes it back, so each effect's burst inverts
+-- when the fill mode inverts.
+local function ForwardIsLeft()
+	return Addon.db.fill ~= "fill"
+end
+
+-- The burst core shared by haste and delay: the directional bar stretch plus
+-- the streak flight, in the effect's color. Leftward bursts pair the
+-- RIGHT-origin stretch (bar.recoil) with the mirrored streak; rightward
+-- bursts pair the LEFT-origin stretch (bar.pop) with the plain streak. Both
+-- streak textures are desaturated, so the vertex color set here fully
+-- controls their tint.
+local function FireBurst(bar, color, leftward)
+	local stretch, streak, shot, group
+	if leftward then
+		stretch, streak, shot, group = bar.recoil, bar.delayStreak, bar.delayStreakShot, bar.delayStreakFX
+	else
+		stretch, streak, shot, group = bar.pop, bar.streak, bar.streakShot, bar.streakFX
+	end
+	if stretch and not stretch:IsPlaying() then
+		stretch:Play()
+	end
+	if streak and group then
+		streak:SetVertexColor(color[1], color[2], color[3])
+		FireStreak(bar, streak, shot, group, leftward)
+	end
 end
 
 local QUEUE_POLL = 0.20
@@ -479,17 +508,20 @@ local function CreateBar(hand)
 	-- client), DESATURATED so the green vertex tint renders it as pure green
 	-- shades instead of multiplying with the art's red - same soft halo shape
 	-- as the interrupt, properly green.
+	-- Directional burst stretches, shared by the haste and delay bursts and
+	-- picked per direction by FireBurst: the LEFT-origin stretch extends the
+	-- bar rightward (fill-mode haste, drain-mode delay), the RIGHT-origin
+	-- stretch leftward (fill-mode delay, drain-mode haste).
 	bar.pop = CreatePopAnimation(bar, "LEFT")
 	bar.recoil = CreatePopAnimation(bar, "RIGHT")
 	bar.hasteGlow, bar.hasteGlowFade = CreateCenterGlow(bar, HASTE_GLOW_ALPHA, HASTE_GLOW_TIME)
 	bar.hasteGlow:SetDesaturated(true)
 	bar.hasteGlow:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
-	-- Early-landing speed streak: the cast bar's pip-glow streak
+	-- Rightward flight streak: the cast bar's pip-glow streak
 	-- (cast_standard_pipglow - its tail already trails left, the right shape
-	-- for rightward motion) desaturated to the haste green, fired from the
-	-- fill's leading edge to the bar's right end while fading out, so the
-	-- whole flight stays inside the bar. The anchor, size and travel are set
-	-- at play time from the live fill edge.
+	-- for rightward motion), desaturated so the play-time vertex color fully
+	-- controls the tint (green for haste, amber for a drain-mode delay). The
+	-- anchor, size and travel are set at play time from the live fill edge.
 	bar.streak = bar.status:CreateTexture(nil, "OVERLAY")
 	bar.streak:SetAtlas(CASTBAR_PIP_GLOW_ATLAS, true)
 	bar.streak:SetDesaturated(true)
@@ -509,10 +541,10 @@ local function CreateBar(hand)
 	bar.streakFX:SetScript("OnFinished", function()
 		bar.streak:Hide()
 	end)
-	-- Movement-delay treatment, the haste stack mirrored: the amber halo plus
-	-- the same streak texture MIRRORED horizontally (the texcoords swap left
-	-- and right) so its bright end leads the leftward flight, desaturated to
-	-- the delay amber. The leftward recoil is created above with the pop.
+	-- Leftward flight streak: the same texture MIRRORED horizontally (the
+	-- texcoords swap left and right) so its bright end leads the leftward
+	-- flight, desaturated for the play-time vertex color (amber for delay,
+	-- green for a drain-mode haste). The amber halo below is directionless.
 	bar.delayGlow, bar.delayGlowFade = CreateCenterGlow(bar, DELAY_GLOW_ALPHA, DELAY_GLOW_TIME)
 	bar.delayGlow:SetDesaturated(true)
 	bar.delayGlow:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
@@ -1084,22 +1116,17 @@ end
 
 -- The interrupted-cast treatment (red tint + red pip + shake), shared by the
 -- clip event and in-flight stops.
--- The parry-haste treatment: fill tint, green spark, pop and outer glow.
--- Shared by the early-landing detection and the test command, so the test
--- path exercises exactly the combat code.
+-- The parry-haste treatment: fill tint, green spark, the forward burst
+-- (rightward in fill mode, leftward in drain) and the outer glow. Shared by
+-- the early-landing detection and the test command, so the test path
+-- exercises exactly the combat code.
 function Bars:HasteFeedback(bar)
 	self:SetFillTint(bar, HASTE_TINT)
 	-- Spark: the tick joins the haste color, restored with the fade
 	-- (FadeFillBack's final step re-applies the fill style).
 	bar.pip:SetVertexColor(HASTE_TINT[1], HASTE_TINT[2], HASTE_TINT[3])
-	if bar.pop and not bar.pop:IsPlaying() then
-		-- Never restart a burst mid-flight; a stutter of events lets the
-		-- running one settle instead of snapping back to rest.
-		bar.pop:Play()
-	end
-	if bar.streak and bar.streakFX then
-		FireStreak(bar, bar.streak, bar.streakShot, bar.streakFX, false)
-	end
+	-- The burst fires forward: with the fill's direction of travel.
+	FireBurst(bar, HASTE_GLOW, ForwardIsLeft())
 	if bar.hasteGlow and bar.hasteGlowFade and not bar.hasteGlowFade:IsPlaying() then
 		bar.hasteGlow:Show()
 		bar.hasteGlowFade:Play()
@@ -1107,9 +1134,9 @@ function Bars:HasteFeedback(bar)
 end
 
 -- The movement-delay treatment, the haste burst mirrored: the amber fill
--- tint, the amber spark, the leftward recoil and the amber streak flying to
--- the bar's left end - time pushed back instead of pulled forward. Shared by
--- the ranged reschedule detection and the test command, so the test path
+-- tint, the amber spark and the backward burst (leftward in fill mode,
+-- rightward in drain) - time pushed back instead of pulled forward. Shared
+-- by the ranged reschedule detection and the test command, so the test path
 -- exercises exactly the combat code.
 function Bars:DelayFeedback(bar)
 	-- One burst per window: a reschedule while the previous burst is still
@@ -1123,12 +1150,8 @@ function Bars:DelayFeedback(bar)
 	-- Spark: the tick joins the delay color, restored with the fade
 	-- (FadeFillBack's final step re-applies the fill style).
 	bar.pip:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
-	if bar.recoil and not bar.recoil:IsPlaying() then
-		bar.recoil:Play()
-	end
-	if bar.delayStreak and bar.delayStreakFX then
-		FireStreak(bar, bar.delayStreak, bar.delayStreakShot, bar.delayStreakFX, true)
-	end
+	-- The burst fires backward: against the fill's direction of travel.
+	FireBurst(bar, DELAY_TINT, not ForwardIsLeft())
 	if bar.delayGlow and bar.delayGlowFade and not bar.delayGlowFade:IsPlaying() then
 		bar.delayGlow:Show()
 		bar.delayGlowFade:Play()
