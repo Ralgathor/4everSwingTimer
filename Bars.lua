@@ -123,6 +123,12 @@ local DELAY_GLOW_TIME = 0.5
 -- launch point. One burst per window; the window outlasts every animation
 -- in the treatment, so a permitted retrigger always starts from rest.
 local DELAY_RETRIGGER_WINDOW = 0.5
+-- The movement-reschedule recast window: the library measured real recasts
+-- at 0.43-0.56 s, and the bounds are padded. SwingStart's ranged UPDATE
+-- classification reads it; the haste preview's ranged morph stays clear of
+-- it (see FireTestEffect).
+local RESCHEDULE_MIN = 0.3
+local RESCHEDULE_MAX = 0.7
 local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
@@ -951,6 +957,7 @@ function Bars:UpdateVisibility()
 		return
 	end
 	local mode = db.visibility
+	local parked = ParkedValue()
 	local visible = {}
 	local any = false
 	for i = 1, #HAND_ORDER do
@@ -969,6 +976,16 @@ function Bars:UpdateVisibility()
 			end
 		end
 		bar:SetShown(show)
+		if not bar.active then
+			-- Parked value and tick are only ever correct together, so every
+			-- visibility pass re-pairs them. This is also the init path's
+			-- only pairing: ApplyLayout's pass runs after the bars are
+			-- sized, so no init-order hazard exists, and the login events
+			-- (entering world, the equipment stream) converge whatever an
+			-- earlier pass could not compute yet.
+			bar.status:SetValue(parked)
+			self:UpdateTickPosition(bar)
+		end
 		visible[hand] = show
 		any = any or show
 	end
@@ -1012,6 +1029,8 @@ function Bars:OnUpdate()
 				-- classifies an expiration this far in the past as a natural
 				-- completion, so no interrupt feedback fires - the bar simply
 				-- converges to the parked state the missing STOP owed it.
+				-- SweepStaleLandings runs the same convergence off a ticker
+				-- while the anchor is hidden (no OnUpdate).
 				self:SwingStop(HAND_ORDER[i])
 			else
 				if remaining < 0 then
@@ -1033,6 +1052,27 @@ function Bars:OnUpdate()
 					bar.time:SetText(format("%.2f", bar.speed))
 				end
 			end
+		end
+	end
+end
+
+-- The visibility-independent half of the stale-landing convergence: OnUpdate
+-- only fires while the anchor is shown, but a login-seeded never-landing
+-- swing exists precisely while it is hidden (first login, out of combat,
+-- locked UI - no visible bar). This sweep runs off a C_Timer ticker (see
+-- Enable) and parks the same stale swings regardless of visibility;
+-- SwingStop does the parking, pairing value, tick and text.
+function Bars:SweepStaleLandings()
+	if not self.bars then
+		return
+	end
+	local now = GetTime()
+	for i = 1, #HAND_ORDER do
+		local hand = HAND_ORDER[i]
+		local bar = self.bars[hand]
+		if bar.active and bar.speed and bar.speed > 0 and bar.expiration
+			and bar.expiration + STALE_LANDING_GRACE < now then
+			self:SwingStop(hand)
 		end
 	end
 end
@@ -1089,7 +1129,7 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 			-- below the threshold - or a dynamic-haste rescale
 			-- (Rapid Fire-class) that shortens the in-flight shot.
 			local recast = expirationTime - GetTime()
-			if recast > 0.3 and recast < 0.7 then
+			if recast > RESCHEDULE_MIN and recast < RESCHEDULE_MAX then
 				self:DelayFeedback(bar)
 			elseif bar.expiration and expirationTime < bar.expiration then
 				-- A shortened landing outside the reschedule window: the
@@ -1509,14 +1549,14 @@ function Bars:FireTestEffect(effect)
 					-- re-anchors at the early landing and completes sooner.
 					local remaining = bar.expiration - now
 					local shortened = math.max(remaining - TEST_HASTE_CUT, 0.1)
-					if hand == "ranged" and shortened > 0.25 and shortened < 0.75 then
+					local nudge = RESCHEDULE_MAX + 0.05
+					if hand == "ranged" and shortened > RESCHEDULE_MIN - 0.05 and shortened < nudge then
 						-- Inside (or on the float edge of) the reschedule
 						-- window a ranged UPDATE would classify as a
-						-- movement delay. The proportional cut can only
-						-- land there while more swing remains than the
-						-- window's far edge, so push the morph just past
-						-- it - never extending the swing.
-						shortened = 0.75
+						-- movement delay. The proportional cut can only land
+						-- there while more swing remains than the window's
+						-- far edge, so the nudge never extends the swing.
+						shortened = nudge
 					end
 					self:SwingStart(hand, TEST_SPEED, now + shortened, true)
 					bar.testSwing = true
@@ -1571,22 +1611,10 @@ function Bars:ApplyAll()
 	self:ApplyText()
 	self:SetLocked(Addon.db.locked)
 	self:ApplyLayout()
-	-- Re-park inactive bars so a fill/drain switch is reflected immediately.
-	-- The pip follows the value here too: ApplySkin's UpdateTickPosition ran
-	-- before ApplyLayout sized the bar (statusWidth 0, early return) and
-	-- before this value change, so without repositioning the tick sits at
-	-- CreateBar's LEFT-edge anchor - a full parked fill-mode bar showing its
-	-- "ready" tick at the far left until the first swing's OnUpdate moves
-	-- it. SwingStop already pairs its parked value with UpdateTickPosition;
-	-- this is the same contract for the init path.
-	local parked = ParkedValue()
-	for i = 1, #HAND_ORDER do
-		local bar = self.bars[HAND_ORDER[i]]
-		if not bar.active then
-			bar.status:SetValue(parked)
-			self:UpdateTickPosition(bar)
-		end
-	end
+	-- No parked-value tail: UpdateVisibility re-parks every inactive bar
+	-- (value and tick paired) on each of its passes, and ApplyLayout's pass
+	-- runs with the bars already sized - the init ordering that once needed
+	-- a tail here is gone by construction.
 end
 
 -- Diagnostic dump for the tick system: run /4everswingtimer debug while the
@@ -1653,6 +1681,12 @@ function Bars:Enable(lib)
 	-- Queued next-melee highlight poll.
 	self.queueTicker = C_Timer.NewTicker(QUEUE_POLL, function()
 		Bars:UpdateQueued()
+	end)
+
+	-- Stale-landing convergence must not depend on the anchor being shown:
+	-- a hidden frame receives no OnUpdate (see SweepStaleLandings).
+	self.staleTicker = C_Timer.NewTicker(STALE_LANDING_GRACE / 2, function()
+		Bars:SweepStaleLandings()
 	end)
 
 	self:ApplyAll()

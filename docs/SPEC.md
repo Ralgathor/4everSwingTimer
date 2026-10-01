@@ -257,12 +257,21 @@ Forever beta:
     of the landing: parked fill position, parked text, hidden in the
     "while swinging" visibility mode, no stuck tick at the fill's edge and
     no interrupt flash. A moving Auto Shot must still fire its amber delay
-    burst at the re-anchor inside that window.
+    burst at the re-anchor inside that window. The convergence must also
+    happen with nothing on screen - a first login out of combat with the UI
+    locked hides the anchor, and a hidden frame receives no OnUpdate, so the
+    convergence runs on a C_Timer ticker (SweepStaleLandings), not only the
+    update loop: log in fresh, wait, then enter combat - the bars must
+    appear already parked correctly.
 14. Parked tick at login: log in (or `/reload`) without swinging - in fill
     mode the parked bar sits at "ready" (full) with its tick at the fill's
     right edge, not at the far left; in drain mode it sits empty with the
     tick at the left, matching a normally landed swing's parked state. The
-    first swing must find the tick at the correct parked position.
+    first swing must find the tick at the correct parked position. Verify on
+    a first-time login too (fresh client start, not just `/reload`), and
+    with the UI locked from the previous session. The parked pair is
+    re-applied on every visibility pass, so the tick must also converge
+    after equipment streaming or world entry, not only at the init pass.
 
 (Classic Era and retail 12.x checklist items were dropped with the Forever-only
 scope amendment.)

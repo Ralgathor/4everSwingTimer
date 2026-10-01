@@ -68,6 +68,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colors (red, amber, yellow) and biased turquoise so the hue jump off the
   curated palettes' blues on the off-hand and ranged bars still reads. The
   fill tint, spark, streak, burst and halo all take the new color together.
+- Stale landings now converge even while the bars are hidden. The
+  stale-landing self-park lived only in the anchor's OnUpdate, and a hidden
+  frame receives no OnUpdate - so at a first-time login (out of combat, UI
+  locked, nothing visible) a login-seeded never-landing swing sat un-parked
+  and its tick stayed at the bar's far left from the initial anchor until
+  the first real swing. The convergence now also runs on a 0.5 s C_Timer
+  ticker (`SweepStaleLandings`), independent of frame visibility, parking
+  the bar
+  - value, tick and text paired - before anything is ever shown. Parked bars
+  additionally re-pair their value and tick on every visibility pass, so
+  whatever an init-time pass could miss converges at the next
+  entering-world / equipment / combat pass instead of depending on one
+  call site's ordering.
 
 ### Fixed
 
