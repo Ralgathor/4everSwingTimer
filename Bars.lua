@@ -1019,11 +1019,15 @@ function Bars:HasteFeedback(bar)
 		local statusWidth = bar.status:GetWidth()
 		local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
 		local edge = bar.status:GetValue() * statusWidth
-		bar.streak:SetSize(math.max(statusWidth * 0.3, 40), math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4))
-		bar.streak:SetPoint("RIGHT", bar.status, "LEFT", edge, 0)
-		-- Travel ends with the streak's head at the bar's right edge - inside,
-		-- not past it: the burst must read as speed within the bar's frame.
-		bar.streakShot:SetOffset(statusWidth - edge, 0)
+		-- Fully contained flight: the width never exceeds the bar, and the
+		-- head launches at the fill edge unless that is less than one
+		-- streak-length from the left end - then from just inside the left
+		-- edge instead, so the tail never pokes out at launch either.
+		local streakWidth = math.min(math.max(statusWidth * 0.3, 40), statusWidth)
+		local start = math.max(edge, streakWidth)
+		bar.streak:SetSize(streakWidth, math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4))
+		bar.streak:SetPoint("RIGHT", bar.status, "LEFT", start, 0)
+		bar.streakShot:SetOffset(statusWidth - start, 0)
 		bar.streakFX:Stop()
 		bar.streak:Show()
 		bar.streakFX:Play()
