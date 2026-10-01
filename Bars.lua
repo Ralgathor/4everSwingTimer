@@ -152,6 +152,18 @@ local STOP_GRACE = 0.10
 -- least ~40% of the weapon speed early (floored at 20% remaining), far
 -- above this threshold.
 local EARLY_LANDING_EPSILON = 0.2
+-- A swing whose expiration has been in the past for longer than this with
+-- no STOP is landed, not in flight. The library seeds an active swing at
+-- login whose landing the engine can never complete (auto-attack does not
+-- survive a /reload), so no UNIT_SWING_TIMER_STOP ever fires - without a
+-- convergence check the bar sits active at 0.0 with the tick parked at the
+-- fill's edge until the next real swing. The grace outlasts the ranged
+-- movement retry - the engine re-attempts a moving Auto Shot ~0.5 s after
+-- the original expiry and the library's UPDATE then re-anchors the
+-- completed-but-active bar, firing the amber delay burst - and the
+-- engine-vs-timer race at a natural landing, whose STOP parks the bar
+-- long before the grace elapses.
+local STALE_LANDING_GRACE = 1.0
 -- Queued next-melee highlight: while a next-melee ability is queued (base IDs;
 -- ranks resolve through the base), the main-hand fill takes the queue color
 -- and the pip - the tick riding the fill edge - gets an additive glow,
@@ -975,23 +987,31 @@ function Bars:OnUpdate()
 		local bar = self.bars[HAND_ORDER[i]]
 		if bar.active and bar.speed and bar.speed > 0 then
 			local remaining = bar.expiration - now
-			if remaining < 0 then
-				remaining = 0
-			end
-			if draining then
-				bar.status:SetValue(remaining / bar.speed)
+			if remaining < -STALE_LANDING_GRACE then
+				-- Park a stale landing (see STALE_LANDING_GRACE). SwingStop
+				-- classifies an expiration this far in the past as a natural
+				-- completion, so no interrupt feedback fires - the bar simply
+				-- converges to the parked state the missing STOP owed it.
+				self:SwingStop(HAND_ORDER[i])
 			else
-				bar.status:SetValue(1 - remaining / bar.speed)
-			end
-			self:UpdateTickPosition(bar)
-			if db.showTime then
-				if db.showSpeed then
-					bar.time:SetText(format("%.1f / %.2f", remaining, bar.speed))
-				else
-					bar.time:SetText(format("%.1f", remaining))
+				if remaining < 0 then
+					remaining = 0
 				end
-			elseif db.showSpeed then
-				bar.time:SetText(format("%.2f", bar.speed))
+				if draining then
+					bar.status:SetValue(remaining / bar.speed)
+				else
+					bar.status:SetValue(1 - remaining / bar.speed)
+				end
+				self:UpdateTickPosition(bar)
+				if db.showTime then
+					if db.showSpeed then
+						bar.time:SetText(format("%.1f / %.2f", remaining, bar.speed))
+					else
+						bar.time:SetText(format("%.1f", remaining))
+					end
+				elseif db.showSpeed then
+					bar.time:SetText(format("%.2f", bar.speed))
+				end
 			end
 		end
 	end

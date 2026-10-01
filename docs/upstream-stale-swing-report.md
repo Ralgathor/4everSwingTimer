@@ -94,6 +94,10 @@ crosses a session boundary as a lie: "in flight" with a landed expiration.
 ## Consumer-side workaround (already shipped, for reference)
 
 4everSwingTimer no longer treats a bar whose expiration has passed as
-"in flight", independent of the missing `STOP`. A library-side fix (no
+"in flight", independent of the missing `STOP` (the effect-test trigger's
+"live" gate), and - since the stuck-at-0.0 bar surfaced in play on the
+shipped MINOR 34 build - its update loop now also parks such a bar itself
+once the landing is more than 1 s stale, a grace sized to keep the ranged
+movement retry's re-anchor working. A library-side fix (no
 login seed for uncompletable swings, or the missing `STOP`) would remove
 the need for consumers to second-guess the event stream.

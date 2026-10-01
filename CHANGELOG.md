@@ -44,6 +44,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolution (fixed by a parked login seed, riding the library's unreleased
   LibStub MINOR 35) both live in `docs/` (not shipped).
 
+### Fixed
+
+- After a login or `/reload` a bar could sit stuck at its swing's end - the
+  tick parked at the fill's edge and the time reading 0.0 - until the next
+  real swing. The shipped library build (v2.2.0-beta3, LibStub MINOR 34)
+  seeds an "in flight" swing at login that the engine can never complete
+  (auto-attack does not survive a reload), so its expiration passes without
+  the STOP that parks a bar; the library-side fix rides its unreleased
+  MINOR 35 (see docs/upstream-stale-swing-report.md). The addon now
+  converges such a bar to the parked state itself once the landing is stale
+  - the expiration has been in the past for over 1 s, a grace that outlasts
+  the ranged movement retry (~0.5 s, so a moving Auto Shot still fires its
+  amber delay burst at the library's re-anchor) and the engine-vs-timer
+  race at a natural landing (whose STOP parks the bar long before the
+  grace elapses). No interrupt feedback fires on the convergence; the bar
+  simply reaches the parked state the missing STOP owed it.
+
 ## [1.0.0-beta2] - 2026-10-01
 
 ### Changed

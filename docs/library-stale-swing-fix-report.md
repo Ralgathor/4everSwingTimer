@@ -63,11 +63,18 @@ Conclusions, both captures:
 
 ## What this repo needs to do
 
-- **Nothing functional.** `Bars:SeedFromLibrary`'s
-  `expirationTime > now` guard never seeds from a parked seed:
-  `INFO_INITIALIZED` is delivered synchronously in the same frame as PEW,
-  so `expirationTime == now` fails the strict guard. Verified live — no
-  bar at login in either capture.
+- **One convergence change, added after the live repro on the shipped
+  build.** The `expirationTime > now` guard in `Bars:SeedFromLibrary`
+  kept parked seeds out (correct with MINOR 35), but on the shipped
+  MINOR 34 the login seed manufactures a synthetic in-flight swing whose
+  expiration is in the future - the guard passes, the bar drains to its
+  end and then sits stuck (tick at the fill's edge, 0.0 remaining, shown
+  in "while swinging" mode) until the next real swing, repro'd in play.
+  `Bars:OnUpdate` now parks a bar whose expiration has been in the past
+  for over 1 s (STALE_LANDING_GRACE - sized above the ranged movement
+  retry's ~0.5 s re-anchor window and the engine-vs-timer race at a
+  natural landing, so neither feedback path is disturbed). With MINOR 35
+  embedded the branch never triggers; keep it anyway.
 - **Keep the expiration-passed workaround** (the "live" gate in
   `Bars:TestEffect`, and the swing-visibility handling). It is a cheap,
   correct defense against any swing that ends without a `STOP` on any
