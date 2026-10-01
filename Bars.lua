@@ -129,7 +129,9 @@ local HASTE_TINT = { 0.30, 1.00, 0.40 }
 local HASTE_GLOW = { 0.25, 1.00, 0.35 }
 local HASTE_GLOW_ALPHA = 0.5
 local HASTE_GLOW_TIME = 0.5
-local HASTE_POP_SCALE = 1.15
+local HASTE_LUNGE_SCALE = 1.12
+local HASTE_LUNGE_OUT = 0.06
+local HASTE_LUNGE_BACK = 0.20
 local STOP_GRACE = 0.10
 -- A swing stopping with less than this remaining is a natural completion,
 -- not an early landing: the engine's PLAYER_SWING and the library's own
@@ -305,21 +307,26 @@ local function CreateShakeAnimation(bar)
 	return group
 end
 
--- Early-landing feedback: the bar scales up briefly and settles - far more
--- visible than a small offset wiggle, and distinct from the interrupt's
--- horizontal shake.
+-- Early-landing feedback: the bar lunges to the right and settles back - a
+-- speed burst in the direction of swing progress. X-only Scale with its
+-- origin on the LEFT edge so only the right side extends; the lunge attacks
+-- with OUT smoothing (instant velocity, decelerating in) and settles with
+-- IN_OUT, so the burst reads snappy without a hard stop. (Keeps the pop
+-- name so the feedback handler is untouched.)
 local function CreatePopAnimation(bar)
 	local group = bar:CreateAnimationGroup()
-	local grow = group:CreateAnimation("Scale")
-	grow:SetScale(HASTE_POP_SCALE, HASTE_POP_SCALE)
-	grow:SetOrigin("CENTER", 0, 0)
-	grow:SetDuration(0.07)
-	grow:SetOrder(1)
-	local shrink = group:CreateAnimation("Scale")
-	shrink:SetScale(1 / HASTE_POP_SCALE, 1 / HASTE_POP_SCALE)
-	shrink:SetOrigin("CENTER", 0, 0)
-	shrink:SetDuration(0.15)
-	shrink:SetOrder(2)
+	local lunge = group:CreateAnimation("Scale")
+	lunge:SetScale(HASTE_LUNGE_SCALE, 1)
+	lunge:SetOrigin("LEFT", 0, 0)
+	lunge:SetDuration(HASTE_LUNGE_OUT)
+	lunge:SetSmoothing("OUT")
+	lunge:SetOrder(1)
+	local settle = group:CreateAnimation("Scale")
+	settle:SetScale(1 / HASTE_LUNGE_SCALE, 1)
+	settle:SetOrigin("LEFT", 0, 0)
+	settle:SetDuration(HASTE_LUNGE_BACK)
+	settle:SetSmoothing("IN_OUT")
+	settle:SetOrder(2)
 	return group
 end
 
