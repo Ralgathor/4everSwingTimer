@@ -132,6 +132,7 @@ local HASTE_GLOW_TIME = 0.5
 local HASTE_LUNGE_SCALE = 1.12
 local HASTE_LUNGE_OUT = 0.06
 local HASTE_LUNGE_BACK = 0.20
+local HASTE_STREAK_TIME = 0.25
 local STOP_GRACE = 0.10
 -- A swing stopping with less than this remaining is a natural completion,
 -- not an early landing: the engine's PLAYER_SWING and the library's own
@@ -436,6 +437,30 @@ local function CreateBar(hand)
 	bar.hasteGlow, bar.hasteGlowFade = CreateCenterGlow(bar, HASTE_GLOW_ALPHA, HASTE_GLOW_TIME)
 	bar.hasteGlow:SetDesaturated(true)
 	bar.hasteGlow:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
+	-- Early-landing speed streak: the cast bar's pip-glow streak
+	-- (cast_standard_pipglow - its tail already trails left, the right shape
+	-- for rightward motion) desaturated to the haste green, fired from the
+	-- fill's leading edge past the bar's right end while fading out. The
+	-- anchor, size and travel are set at play time from the live fill edge.
+	bar.streak = bar.status:CreateTexture(nil, "OVERLAY")
+	bar.streak:SetAtlas(CASTBAR_PIP_GLOW_ATLAS, true)
+	bar.streak:SetDesaturated(true)
+	bar.streak:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
+	bar.streak:SetBlendMode("ADD")
+	bar.streak:Hide()
+	bar.streakFX = bar.streak:CreateAnimationGroup()
+	bar.streakShot = bar.streakFX:CreateAnimation("Translation")
+	bar.streakShot:SetDuration(HASTE_STREAK_TIME)
+	bar.streakShot:SetSmoothing("OUT")
+	bar.streakShot:SetOrder(1)
+	local streakFade = bar.streakFX:CreateAnimation("Alpha")
+	streakFade:SetFromAlpha(0.9)
+	streakFade:SetToAlpha(0)
+	streakFade:SetDuration(HASTE_STREAK_TIME)
+	streakFade:SetOrder(1)
+	bar.streakFX:SetScript("OnFinished", function()
+		bar.streak:Hide()
+	end)
 
 	bar.active = false
 	bar.paused = false
@@ -988,6 +1013,17 @@ function Bars:HasteFeedback(bar)
 	if bar.pop then
 		bar.pop:Stop()
 		bar.pop:Play()
+	end
+	if bar.streak and bar.streakFX then
+		local statusWidth = bar.status:GetWidth()
+		local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
+		local edge = bar.status:GetValue() * statusWidth
+		bar.streak:SetSize(math.max(statusWidth * 0.3, 40), math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4))
+		bar.streak:SetPoint("RIGHT", bar.status, "LEFT", edge, 0)
+		bar.streakShot:SetOffset(statusWidth - edge + bar.streak:GetWidth(), 0)
+		bar.streakFX:Stop()
+		bar.streak:Show()
+		bar.streakFX:Play()
 	end
 	if bar.hasteGlow and bar.hasteGlowFade then
 		bar.hasteGlow:Show()
