@@ -1059,16 +1059,27 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 		end
 	elseif hand == "ranged" then
 		if bar.active then
-			-- On WoW: Forever a mid-swing ranged UPDATE is the movement-cancelled
-			-- Auto Shot reschedule: the engine re-attempts the shot and the
-			-- library predicts the next landing at now + ~0.5 s (measured recasts
-			-- 0.43-0.56 s). Detect that signature directly - comparing the new
-			-- expiration against the old one misses fails early in the cast
-			-- window, where the reschedule lands close to the original time and
-			-- the push is below the threshold.
+			-- On WoW: Forever a mid-swing ranged UPDATE is either the
+			-- movement-cancelled Auto Shot reschedule - the engine re-attempts
+			-- the shot and the library predicts the next landing at
+			-- now + ~0.5 s (measured recasts 0.43-0.56 s); detect that
+			-- signature directly, comparing the new expiration against the
+			-- old one misses fails early in the cast window, where the
+			-- reschedule lands close to the original time and the push is
+			-- below the threshold - or a dynamic-haste rescale
+			-- (Rapid Fire-class) that shortens the in-flight shot.
 			local recast = expirationTime - GetTime()
 			if recast > 0.3 and recast < 0.7 then
 				self:DelayFeedback(bar)
+			elseif bar.expiration and expirationTime < bar.expiration then
+				-- A shortened landing outside the reschedule window: the
+				-- rescale case. The shot lands early - the same green pop
+				-- the melee hands take for a parry or a melee haste proc.
+				-- The window keeps precedence (a rescale on a short
+				-- remaining swing can land inside it and reads as a
+				-- reschedule); an UPDATE that does not shorten stays
+				-- quiet.
+				self:HasteFeedback(bar)
 			end
 		end
 	elseif bar.active then
@@ -1313,7 +1324,8 @@ end
 -- the effect's hands, the fake test swing starts first, scoped to the
 -- effect's own hands, and the effect lands through the real event
 -- signature: the interrupt restarts the swing (a cast reset), the haste
--- shortens it (a parry UPDATE), the delay recasts it at the swing's own
+-- shortens it (a parry UPDATE on the melee hands, a dynamic-haste
+-- rescale on ranged), the delay recasts it at the swing's own
 -- landing (a movement-cancel retry), the queued highlight rides it. With a
 -- swing already in flight, the effect morphs that swing the same way when
 -- it is the preview's own fake swing (bar.testSwing), and fires the plain
@@ -1327,17 +1339,20 @@ local TEST_QUEUED_TIME = 3.0
 local TEST_EFFECT_OFFSET = 0.5
 -- Which hands each effect's preview swings and treats: a cast reset
 -- restarts the whole swing timer (all enabled hands, the default scope);
--- parry haste is melee-only; the movement reschedule is a ranged signature;
--- the queued highlight paints the main-hand bar.
+-- haste covers the melee parry UPDATE and the ranged dynamic-haste
+-- rescale; the movement reschedule is a ranged signature; the queued
+-- highlight paints the main-hand bar.
 local TEST_EFFECT_HANDS = {
-	haste = { "mainhand", "offhand" },
+	haste = { "mainhand", "offhand", "ranged" },
 	delay = { "ranged" },
 	queued = { "mainhand" },
 }
--- The parry-haste preview shortens the swing's remaining time by the
--- classic 40%-of-weapon-speed cut (off TEST_SPEED), the same proportional
--- shortening the library's ApplyParryHaste applies, so it fires through the
--- same mid-swing UPDATE detection the real event takes.
+-- The haste preview shortens the swing's remaining time by the classic
+-- 40%-of-weapon-speed cut (off TEST_SPEED) - the same proportional
+-- shortening the library's ApplyParryHaste applies - so it fires through
+-- the same mid-swing UPDATE detection the real events take: the parry
+-- UPDATE on the melee hands, the dynamic-haste rescale on ranged (whose
+-- morph FireTestEffect keeps clear of the reschedule window).
 local TEST_HASTE_CUT = TEST_SPEED * 0.4
 -- The movement reschedule is a RETRY, not a mid-swing event: the ranged
 -- swing runs all the way to its landing, the shot cannot fire while the
@@ -1464,10 +1479,20 @@ function Bars:FireTestEffect(effect)
 			elseif effect == "haste" then
 				if fake then
 					-- Mid-swing UPDATE, same speed, shortened expiry: the
-					-- real parry-haste signature. The bar re-anchors at
-					-- the early landing and completes sooner.
+					-- real haste signature - the parry UPDATE on the melee
+					-- hands, the dynamic-haste rescale on ranged. The bar
+					-- re-anchors at the early landing and completes sooner.
 					local remaining = bar.expiration - now
 					local shortened = math.max(remaining - TEST_HASTE_CUT, 0.1)
+					if hand == "ranged" and shortened > 0.25 and shortened < 0.75 then
+						-- Inside (or on the float edge of) the reschedule
+						-- window a ranged UPDATE would classify as a
+						-- movement delay. The proportional cut can only
+						-- land there while more swing remains than the
+						-- window's far edge, so push the morph just past
+						-- it - never extending the swing.
+						shortened = 0.75
+					end
 					self:SwingStart(hand, TEST_SPEED, now + shortened, true)
 					bar.testSwing = true
 					self:ArmTestStop(hand, shortened)

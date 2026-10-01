@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   referenced from the TOC's new `## IconTexture`, so the addon list and the
   Settings AddOns tab show the project logo instead of a blank tile. The
   logo sources remain in `docs/`, which is not shipped.
+- Ranged dynamic-haste feedback: a mid-swing ranged
+  `UNIT_SWING_TIMER_UPDATE` that shortens the shot's landing (a
+  Rapid Fire-class rescale, via the library's dynamic-haste rescale) now
+  fires the green haste pop instead of silently re-anchoring. The
+  movement-reschedule window keeps precedence - a ~0.5 s recast still
+  reads as the amber delay. The haste test preview accordingly covers the
+  ranged bar too, its fake-swing morph nudged past the reschedule window
+  so it lands through the same shortened-landing path.
 
 ### Changed
 
@@ -22,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   current state. With no swing in flight the same fake 2.0 s swing as the
   plain test command starts first, scoped to the effect's own hands, and the
   effect lands through the real detection paths: the interrupt restarts the
-  swing mid-flight like a cast reset, the haste shortens the melee swings
-  like the parry UPDATE (the bar re-anchors at the early landing), the delay
+  swing mid-flight like a cast reset, the haste shortens the swings - the
+  parry UPDATE on the melee hands, the dynamic-haste rescale on ranged (the
+  bars re-anchor at the early landing) - the delay
   replays the movement-cancel retry at the ranged swing's own landing - the
   bar completes, cannot fire, pulls back and lands ~0.5 s later - and the
   queued highlight rides a swinging main-hand bar until the swing lands and

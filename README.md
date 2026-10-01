@@ -10,7 +10,7 @@ That means the bars also show what happens *between* swings:
 
 - cast-completion swing resets (the bar turns red and shakes, like the
   game's interrupted cast bar, then restarts),
-- parry-hasted early landings (the bar pops with a green glow),
+- parry-hasted early landings and ranged haste procs (the bar pops with a green glow),
 - queued next-melee abilities (Heroic Strike, Cleave, Raptor Strike, Maul) -
   the main-hand fill takes the cast bar's yellow and the tick lights up with
   a glow while one is queued (both bar styles),
