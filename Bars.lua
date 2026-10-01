@@ -112,6 +112,8 @@ local TEST_SPEED = 2.0
 -- ShakeStrengthUI CVar.
 local CLIP_TINT = { 1.0, 0.25, 0.20 }
 local DELAY_TINT = { 1.0, 0.60, 0.10 }
+local DELAY_GLOW_ALPHA = 0.5
+local DELAY_GLOW_TIME = 0.5
 local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
@@ -132,7 +134,7 @@ local HASTE_GLOW_TIME = 0.5
 local HASTE_LUNGE_SCALE = 1.12
 local HASTE_LUNGE_OUT = 0.06
 local HASTE_LUNGE_BACK = 0.20
-local HASTE_STREAK_TIME = 0.25
+local STREAK_TIME = 0.25
 local STOP_GRACE = 0.10
 -- A swing stopping with less than this remaining is a natural completion,
 -- not an early landing: the engine's PLAYER_SWING and the library's own
@@ -201,6 +203,37 @@ local function ApplyPipSize(bar, atlas)
 		bar.pip:SetSize(tickHeight * (nativeW / nativeH), tickHeight)
 	end
 end
+
+-- Fires a contained streak flight across the fill. Forward (haste): the
+-- head launches at the fill's leading edge and travels to the bar's right
+-- end. Reverse (delay): the mirrored streak launches at the leading edge and
+-- travels to the left end - the exact inverse. In both directions the launch
+-- shifts inside when the fill edge is too close to the near end for the tail
+-- to fit, so the whole flight stays inside the bar.
+local function FireStreak(bar, streak, shot, group, reverse)
+	local statusWidth = bar.status:GetWidth()
+	local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
+	local edge = bar.status:GetValue() * statusWidth
+	local streakWidth = math.min(math.max(statusWidth * 0.3, 40), statusWidth)
+	streak:SetSize(streakWidth, math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4))
+	if reverse then
+		-- The head is the LEFT edge: launch at the fill edge unless the tail
+		-- would pass the right end - then from just inside it.
+		local start = math.min(edge, statusWidth - streakWidth)
+		streak:SetPoint("LEFT", bar.status, "LEFT", start, 0)
+		shot:SetOffset(-start, 0)
+	else
+		-- The head is the RIGHT edge: launch at the fill edge unless the tail
+		-- would pass the left end - then from just inside it.
+		local start = math.max(edge, streakWidth)
+		streak:SetPoint("RIGHT", bar.status, "LEFT", start, 0)
+		shot:SetOffset(statusWidth - start, 0)
+	end
+	group:Stop()
+	streak:Show()
+	group:Play()
+end
+
 local QUEUE_POLL = 0.20
 
 local Bars = {}
@@ -308,23 +341,23 @@ local function CreateShakeAnimation(bar)
 	return group
 end
 
--- Early-landing feedback: the bar lunges to the right and settles back - a
--- speed burst in the direction of swing progress. X-only Scale with its
--- origin on the LEFT edge so only the right side extends; the lunge attacks
--- with OUT smoothing (instant velocity, decelerating in) and settles with
--- IN_OUT, so the burst reads snappy without a hard stop. (Keeps the pop
--- name so the feedback handler is untouched.)
-local function CreatePopAnimation(bar)
+-- Burst feedback, mirrored by direction: an X-only Scale whose origin sits on
+-- the bar edge OPPOSITE the travel, so the bar extends only toward its motion.
+-- Haste ("LEFT") lunges rightward - a speed burst in the direction of swing
+-- progress; delay ("RIGHT") recoils leftward - time pushed back. The attack
+-- uses OUT smoothing (instant velocity, decelerating in) and settles with
+-- IN_OUT, so the burst reads snappy without a hard stop.
+local function CreatePopAnimation(bar, origin)
 	local group = bar:CreateAnimationGroup()
 	local lunge = group:CreateAnimation("Scale")
 	lunge:SetScale(HASTE_LUNGE_SCALE, 1)
-	lunge:SetOrigin("LEFT", 0, 0)
+	lunge:SetOrigin(origin, 0, 0)
 	lunge:SetDuration(HASTE_LUNGE_OUT)
 	lunge:SetSmoothing("OUT")
 	lunge:SetOrder(1)
 	local settle = group:CreateAnimation("Scale")
 	settle:SetScale(1 / HASTE_LUNGE_SCALE, 1)
-	settle:SetOrigin("LEFT", 0, 0)
+	settle:SetOrigin(origin, 0, 0)
 	settle:SetDuration(HASTE_LUNGE_BACK)
 	settle:SetSmoothing("IN_OUT")
 	settle:SetOrder(2)
@@ -433,7 +466,8 @@ local function CreateBar(hand)
 	-- client), DESATURATED so the green vertex tint renders it as pure green
 	-- shades instead of multiplying with the art's red - same soft halo shape
 	-- as the interrupt, properly green.
-	bar.pop = CreatePopAnimation(bar)
+	bar.pop = CreatePopAnimation(bar, "LEFT")
+	bar.recoil = CreatePopAnimation(bar, "RIGHT")
 	bar.hasteGlow, bar.hasteGlowFade = CreateCenterGlow(bar, HASTE_GLOW_ALPHA, HASTE_GLOW_TIME)
 	bar.hasteGlow:SetDesaturated(true)
 	bar.hasteGlow:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
@@ -451,16 +485,50 @@ local function CreateBar(hand)
 	bar.streak:Hide()
 	bar.streakFX = bar.streak:CreateAnimationGroup()
 	bar.streakShot = bar.streakFX:CreateAnimation("Translation")
-	bar.streakShot:SetDuration(HASTE_STREAK_TIME)
+	bar.streakShot:SetDuration(STREAK_TIME)
 	bar.streakShot:SetSmoothing("OUT")
 	bar.streakShot:SetOrder(1)
 	local streakFade = bar.streakFX:CreateAnimation("Alpha")
 	streakFade:SetFromAlpha(0.9)
 	streakFade:SetToAlpha(0)
-	streakFade:SetDuration(HASTE_STREAK_TIME)
+	streakFade:SetDuration(STREAK_TIME)
 	streakFade:SetOrder(1)
 	bar.streakFX:SetScript("OnFinished", function()
 		bar.streak:Hide()
+	end)
+	-- Movement-delay treatment, the haste stack mirrored: the amber halo plus
+	-- the same streak texture MIRRORED horizontally (the texcoords swap left
+	-- and right) so its bright end leads the leftward flight, desaturated to
+	-- the delay amber. The leftward recoil is created above with the pop.
+	bar.delayGlow, bar.delayGlowFade = CreateCenterGlow(bar, DELAY_GLOW_ALPHA, DELAY_GLOW_TIME)
+	bar.delayGlow:SetDesaturated(true)
+	bar.delayGlow:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
+	bar.delayStreak = bar.status:CreateTexture(nil, "OVERLAY")
+	bar.delayStreak:SetAtlas(CASTBAR_PIP_GLOW_ATLAS, true)
+	local ulx, uly, llx, lly, urx, ury, lrx, lry = bar.delayStreak:GetTexCoord()
+	if lrx then
+		-- Eight-value texcoords (atlas textures): UL<->UR, LL<->LR.
+		bar.delayStreak:SetTexCoord(urx, ury, lrx, lry, ulx, uly, llx, lly)
+	else
+		-- Four-value form: ULx,ULy and LRx,LRy swap.
+		bar.delayStreak:SetTexCoord(llx, lly, ulx, uly)
+	end
+	bar.delayStreak:SetDesaturated(true)
+	bar.delayStreak:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
+	bar.delayStreak:SetBlendMode("ADD")
+	bar.delayStreak:Hide()
+	bar.delayStreakFX = bar.delayStreak:CreateAnimationGroup()
+	bar.delayStreakShot = bar.delayStreakFX:CreateAnimation("Translation")
+	bar.delayStreakShot:SetDuration(STREAK_TIME)
+	bar.delayStreakShot:SetSmoothing("OUT")
+	bar.delayStreakShot:SetOrder(1)
+	local delayFade = bar.delayStreakFX:CreateAnimation("Alpha")
+	delayFade:SetFromAlpha(0.9)
+	delayFade:SetToAlpha(0)
+	delayFade:SetDuration(STREAK_TIME)
+	delayFade:SetOrder(1)
+	bar.delayStreakFX:SetScript("OnFinished", function()
+		bar.delayStreak:Hide()
 	end)
 
 	bar.active = false
@@ -931,7 +999,7 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 			-- the push is below the threshold.
 			local recast = expirationTime - GetTime()
 			if recast > 0.3 and recast < 0.7 then
-				self:SetFillTint(bar, DELAY_TINT)
+				self:DelayFeedback(bar)
 			end
 		end
 	elseif bar.active then
@@ -1016,21 +1084,7 @@ function Bars:HasteFeedback(bar)
 		bar.pop:Play()
 	end
 	if bar.streak and bar.streakFX then
-		local statusWidth = bar.status:GetWidth()
-		local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
-		local edge = bar.status:GetValue() * statusWidth
-		-- Fully contained flight: the width never exceeds the bar, and the
-		-- head launches at the fill edge unless that is less than one
-		-- streak-length from the left end - then from just inside the left
-		-- edge instead, so the tail never pokes out at launch either.
-		local streakWidth = math.min(math.max(statusWidth * 0.3, 40), statusWidth)
-		local start = math.max(edge, streakWidth)
-		bar.streak:SetSize(streakWidth, math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4))
-		bar.streak:SetPoint("RIGHT", bar.status, "LEFT", start, 0)
-		bar.streakShot:SetOffset(statusWidth - start, 0)
-		bar.streakFX:Stop()
-		bar.streak:Show()
-		bar.streakFX:Play()
+		FireStreak(bar, bar.streak, bar.streakShot, bar.streakFX, false)
 	end
 	if bar.hasteGlow and bar.hasteGlowFade then
 		bar.hasteGlow:Show()
@@ -1039,6 +1093,29 @@ function Bars:HasteFeedback(bar)
 	end
 end
 
+-- The movement-delay treatment, the haste burst mirrored: the amber fill
+-- tint, the amber spark, the leftward recoil and the amber streak flying to
+-- the bar's left end - time pushed back instead of pulled forward. Shared by
+-- the ranged reschedule detection and the test command, so the test path
+-- exercises exactly the combat code.
+function Bars:DelayFeedback(bar)
+	self:SetFillTint(bar, DELAY_TINT)
+	-- Spark: the tick joins the delay color, restored with the fade
+	-- (FadeFillBack's final step re-applies the fill style).
+	bar.pip:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
+	if bar.recoil then
+		bar.recoil:Stop()
+		bar.recoil:Play()
+	end
+	if bar.delayStreak and bar.delayStreakFX then
+		FireStreak(bar, bar.delayStreak, bar.delayStreakShot, bar.delayStreakFX, true)
+	end
+	if bar.delayGlow and bar.delayGlowFade then
+		bar.delayGlow:Show()
+		bar.delayGlowFade:Stop()
+		bar.delayGlowFade:Play()
+	end
+end
 function Bars:InterruptFeedback(bar)
 	self:SetFillTint(bar, CLIP_TINT)
 	-- The cast bar's interrupted spark: the tick swaps to the red pip atlas,
@@ -1152,7 +1229,7 @@ function Bars:TestEffect(effect)
 		end)
 	elseif effect == "delay" then
 		ForEnabled(function(bar)
-			self:SetFillTint(bar, DELAY_TINT)
+			self:DelayFeedback(bar)
 		end)
 	elseif effect == "queued" then
 		local bar = self.bars.mainhand

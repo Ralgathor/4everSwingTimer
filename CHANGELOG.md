@@ -15,7 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an outer glow; a parry-haste shortening bursts the bar to the right with
   a green speed streak fired from the fill's edge, plus a green halo behind
   the bar; a
-  movement-delayed Auto Shot tints the bar amber; a paused swing gets a paused
+  movement-delayed Auto Shot recoils the bar leftward with an amber streak
+  to the left end - the haste burst inverted - plus an amber halo; a paused
+  swing gets a paused
   tint; a queued next-melee ability (Heroic Strike, Cleave, Raptor Strike,
   Maul) tints the main-hand fill the cast bar's yellow. Plus an optional
   main/off-hand delta text and a one-time notice when the game's own swing
