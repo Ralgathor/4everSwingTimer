@@ -1,5 +1,5 @@
 ## Interface: 16001
-## Version: 1.0.0-beta1
+## Version: 1.0.0-beta2
 ## Title: 4everSwingTimer
 ## Notes: Swing timer bars for WoW: Forever - main-hand, off-hand and ranged, accurate between swings via LibClassicSwingTimerAPI.
 ## Author: Ralgathor
