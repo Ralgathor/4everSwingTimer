@@ -323,13 +323,19 @@ local function CreatePopAnimation(bar)
 	return group
 end
 
--- The cast bar's interrupt outer glow as a reusable overlay: the
+-- The cast bar's interrupt outer glow as a reusable halo: the
 -- cast_interrupt_outerglow atlas in ADD blend, atlas-sized at half scale
 -- (useAtlasSize + scale 0.5 in CastingBarFrame.xml, fixed size regardless of
 -- bar size), centered on the bar; flashed to fromAlpha and faded to zero over
--- fadeDuration, hidden when the fade finishes.
+-- fadeDuration, hidden when the fade finishes. BACKGROUND draw layer on the
+-- bar frame, sublevel -1 - below the skin's bg and border regions (default
+-- sublevel 0) like the native InterruptGlow, which CastingBarFrameBaseTemplate
+-- puts in BACKGROUND textureSubLevel 1, under its own Background (sublevel
+-- 2): the halo fringes outside the bar's silhouette instead of washing over
+-- the fill, text or border.
 local function CreateCenterGlow(bar, fromAlpha, fadeDuration)
-	local glow = bar.status:CreateTexture(nil, "OVERLAY")
+	local glow = bar:CreateTexture(nil, "BACKGROUND")
+	glow:SetDrawLayer("BACKGROUND", -1)
 	glow:SetAtlas(CASTBAR_INTERRUPT_GLOW_ATLAS, true)
 	local width, height = glow:GetSize()
 	glow:SetSize(width * 0.5, height * 0.5)
@@ -406,8 +412,9 @@ local function CreateBar(hand)
 	bar.time:SetText("0.0")
 
 	-- The cast bar's interrupted outer glow, flashed to full and faded to
-	-- zero over exactly 1.0 s (InterruptGlowAnim). Created after the text so
-	-- it covers it like the native glow does.
+	-- zero over exactly 1.0 s (InterruptGlowAnim). BACKGROUND sublevel -1 on
+	-- the bar frame, so the glow stays behind the bg, border, fill and text -
+	-- the native glow never covers anything either.
 	bar.interruptGlow, bar.interruptGlowFade = CreateCenterGlow(bar, 1.0, 1.0)
 
 	-- Interrupted-cast shake: alternating horizontal translation keyframes,
