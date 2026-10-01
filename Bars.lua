@@ -114,6 +114,13 @@ local CLIP_TINT = { 1.0, 0.25, 0.20 }
 local DELAY_TINT = { 1.0, 0.60, 0.10 }
 local DELAY_GLOW_ALPHA = 0.5
 local DELAY_GLOW_TIME = 0.5
+-- Movement-delay retriggers: a stuttering Auto Shot can reschedule several
+-- times within a second, and every UPDATE is a genuine reschedule - but the
+-- burst must not refire while the previous one is still running: Stop/Play
+-- mid-flight snaps the recoil back to rest and teleports the streak to its
+-- launch point. One burst per window; the window outlasts every animation
+-- in the treatment, so a permitted retrigger always starts from rest.
+local DELAY_RETRIGGER_WINDOW = 0.5
 local TINT_HOLD = 0.45
 local TINT_FADE = 0.30
 local TINT_STEPS = 8
@@ -211,6 +218,12 @@ end
 -- shifts inside when the fill edge is too close to the near end for the tail
 -- to fit, so the whole flight stays inside the bar.
 local function FireStreak(bar, streak, shot, group, reverse)
+	if group:IsPlaying() then
+		-- A flight is already running: restarting would snap it back to its
+		-- launch point mid-air. Let it finish; the tint still carries the
+		-- new event.
+		return
+	end
 	local statusWidth = bar.status:GetWidth()
 	local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
 	local edge = bar.status:GetValue() * statusWidth
@@ -1079,16 +1092,16 @@ function Bars:HasteFeedback(bar)
 	-- Spark: the tick joins the haste color, restored with the fade
 	-- (FadeFillBack's final step re-applies the fill style).
 	bar.pip:SetVertexColor(HASTE_TINT[1], HASTE_TINT[2], HASTE_TINT[3])
-	if bar.pop then
-		bar.pop:Stop()
+	if bar.pop and not bar.pop:IsPlaying() then
+		-- Never restart a burst mid-flight; a stutter of events lets the
+		-- running one settle instead of snapping back to rest.
 		bar.pop:Play()
 	end
 	if bar.streak and bar.streakFX then
 		FireStreak(bar, bar.streak, bar.streakShot, bar.streakFX, false)
 	end
-	if bar.hasteGlow and bar.hasteGlowFade then
+	if bar.hasteGlow and bar.hasteGlowFade and not bar.hasteGlowFade:IsPlaying() then
 		bar.hasteGlow:Show()
-		bar.hasteGlowFade:Stop()
 		bar.hasteGlowFade:Play()
 	end
 end
@@ -1099,20 +1112,25 @@ end
 -- the ranged reschedule detection and the test command, so the test path
 -- exercises exactly the combat code.
 function Bars:DelayFeedback(bar)
+	-- One burst per window: a reschedule while the previous burst is still
+	-- running must not restart it mid-flight.
+	local now = GetTime()
+	if now - (bar.delayAt or 0) < DELAY_RETRIGGER_WINDOW then
+		return
+	end
+	bar.delayAt = now
 	self:SetFillTint(bar, DELAY_TINT)
 	-- Spark: the tick joins the delay color, restored with the fade
 	-- (FadeFillBack's final step re-applies the fill style).
 	bar.pip:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
-	if bar.recoil then
-		bar.recoil:Stop()
+	if bar.recoil and not bar.recoil:IsPlaying() then
 		bar.recoil:Play()
 	end
 	if bar.delayStreak and bar.delayStreakFX then
 		FireStreak(bar, bar.delayStreak, bar.delayStreakShot, bar.delayStreakFX, true)
 	end
-	if bar.delayGlow and bar.delayGlowFade then
+	if bar.delayGlow and bar.delayGlowFade and not bar.delayGlowFade:IsPlaying() then
 		bar.delayGlow:Show()
-		bar.delayGlowFade:Stop()
 		bar.delayGlowFade:Play()
 	end
 end
