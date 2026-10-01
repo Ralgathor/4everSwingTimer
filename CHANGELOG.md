@@ -52,6 +52,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   upstream report for that library issue and the record of its library-side
   resolution (fixed by a parked login seed, riding the library's unreleased
   LibStub MINOR 35) both live in `docs/` (not shipped).
+- The delay burst is now the haste pop's anti-version. It previously
+  mirrored the pop - anchoring the bar's right side and kicking its left
+  edge out, which read as a leftward lunge; it now keeps the haste pop's
+  own trailing anchor and inverts the scale, so the bar flinches IN and its
+  leading edge is yanked back - the delay reads as time pulled back rather
+  than a second, mirrored lunge. The amber streak still flies backward,
+  the fill tint, spark and glow are unchanged, and the effect inverts with
+  the fill mode exactly as before.
 
 ### Fixed
 

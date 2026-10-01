@@ -269,17 +269,25 @@ local function ForwardIsLeft()
 end
 
 -- The burst core shared by haste and delay: the directional bar stretch plus
--- the streak flight, in the effect's color. Leftward bursts pair the
--- RIGHT-origin stretch (bar.recoil) with the mirrored streak; rightward
--- bursts pair the LEFT-origin stretch (bar.pop) with the plain streak. Both
--- streak textures are desaturated, so the vertex color set here fully
--- controls their tint.
-local function FireBurst(bar, color, leftward)
+-- the streak flight, in the effect's color. Leftward flights use the
+-- mirrored streak, rightward flights the plain one; both streak textures
+-- are desaturated, so the vertex color set here fully controls their tint.
+-- The stretch is mode-anchored, not travel-anchored: the haste pop lunges
+-- OUT from the fill's trailing edge, thrusting the leading edge forward,
+-- and the delay anti-burst flinches IN from that same trailing anchor -
+-- same anchor, scale inverted - while the streak still flies against the
+-- fill's direction of travel.
+local function FireBurst(bar, color, leftward, anti)
 	local stretch, streak, shot, group
 	if leftward then
-		stretch, streak, shot, group = bar.recoil, bar.delayStreak, bar.delayStreakShot, bar.delayStreakFX
+		streak, shot, group = bar.delayStreak, bar.delayStreakShot, bar.delayStreakFX
 	else
-		stretch, streak, shot, group = bar.pop, bar.streak, bar.streakShot, bar.streakFX
+		streak, shot, group = bar.streak, bar.streakShot, bar.streakFX
+	end
+	if anti then
+		stretch = ForwardIsLeft() and bar.recoilIn or bar.popIn
+	else
+		stretch = leftward and bar.recoil or bar.pop
 	end
 	if stretch and not stretch:IsPlaying() then
 		stretch:Play()
@@ -397,22 +405,25 @@ local function CreateShakeAnimation(bar)
 	return group
 end
 
--- Burst feedback, mirrored by direction: an X-only Scale whose origin sits on
--- the bar edge OPPOSITE the travel, so the bar extends only toward its motion.
--- Haste ("LEFT") lunges rightward - a speed burst in the direction of swing
--- progress; delay ("RIGHT") recoils leftward - time pushed back. The attack
--- uses OUT smoothing (instant velocity, decelerating in) and settles with
--- IN_OUT, so the burst reads snappy without a hard stop.
-local function CreatePopAnimation(bar, origin)
+-- Burst feedback, mirrored by direction: an X-only Scale whose origin sits
+-- on the bar edge OPPOSITE the travel, so the bar extends only toward its
+-- motion. Haste ("LEFT") lunges rightward - a speed burst in the direction
+-- of swing progress. The attack uses OUT smoothing (instant velocity,
+-- decelerating in) and settles with IN_OUT, so the burst reads snappy
+-- without a hard stop. The shrink variant is the ANTI-burst: the same
+-- anchor with the scale inverted, so the bar flinches IN - its leading edge
+-- yanked back toward the anchor - the exact inverse of the pop; the delay
+-- treatment uses it to read as time pulled back instead of a lunge.
+local function CreatePopAnimation(bar, origin, shrink)
 	local group = bar:CreateAnimationGroup()
 	local lunge = group:CreateAnimation("Scale")
-	lunge:SetScale(BURST_SCALE, 1)
+	lunge:SetScale(shrink and (1 / BURST_SCALE) or BURST_SCALE, 1)
 	lunge:SetOrigin(origin, 0, 0)
 	lunge:SetDuration(BURST_OUT)
 	lunge:SetSmoothing("OUT")
 	lunge:SetOrder(1)
 	local settle = group:CreateAnimation("Scale")
-	settle:SetScale(1 / BURST_SCALE, 1)
+	settle:SetScale(shrink and BURST_SCALE or (1 / BURST_SCALE), 1)
 	settle:SetOrigin(origin, 0, 0)
 	settle:SetDuration(BURST_BACK)
 	settle:SetSmoothing("IN_OUT")
@@ -561,12 +572,15 @@ local function CreateBar(hand)
 	-- client), DESATURATED so the green vertex tint renders it as pure green
 	-- shades instead of multiplying with the art's red - same soft halo shape
 	-- as the interrupt, properly green.
-	-- Directional burst stretches, shared by the haste and delay bursts and
-	-- picked per direction by FireBurst: the LEFT-origin stretch extends the
-	-- bar rightward (fill-mode haste, drain-mode delay), the RIGHT-origin
-	-- stretch leftward (fill-mode delay, drain-mode haste).
+	-- Directional burst stretches. The haste pop lunges OUT from the fill's
+	-- trailing edge - LEFT-anchored in fill mode (bar.pop), RIGHT-anchored
+	-- in drain (bar.recoil) - thrusting the leading edge forward. The delay
+	-- anti-burst (popIn/recoilIn) keeps those same anchors with the scale
+	-- inverted, so the bar flinches IN, its leading edge yanked back.
 	bar.pop = CreatePopAnimation(bar, "LEFT")
 	bar.recoil = CreatePopAnimation(bar, "RIGHT")
+	bar.popIn = CreatePopAnimation(bar, "LEFT", true)
+	bar.recoilIn = CreatePopAnimation(bar, "RIGHT", true)
 	bar.hasteGlow, bar.hasteGlowFade = CreateCenterGlow(bar, HASTE_GLOW_ALPHA, HASTE_GLOW_TIME)
 	bar.hasteGlow:SetDesaturated(true)
 	bar.hasteGlow:SetVertexColor(HASTE_GLOW[1], HASTE_GLOW[2], HASTE_GLOW[3])
@@ -1169,11 +1183,13 @@ function Bars:HasteFeedback(bar)
 	end
 end
 
--- The movement-delay treatment, the haste burst mirrored: the amber fill
--- tint, the amber spark and the backward burst (leftward in fill mode,
--- rightward in drain) - time pushed back instead of pulled forward. Shared
--- by the ranged reschedule detection and the test command, so the test path
--- exercises exactly the combat code.
+-- The movement-delay treatment, the haste burst inverted: the amber fill
+-- tint, the amber spark and the anti-pop - the haste pop's own trailing
+-- anchor with the scale flipped, so the bar flinches back (its leading edge
+-- yanked) instead of lunging forward, while the amber streak still flies
+-- backward (leftward in fill mode, rightward in drain) - time pushed back
+-- instead of pulled forward. Shared by the ranged reschedule detection
+-- and the test command, so the test path exercises exactly the combat code.
 function Bars:DelayFeedback(bar)
 	-- One burst per window: a reschedule while the previous burst is still
 	-- running must not restart it mid-flight.
@@ -1186,8 +1202,11 @@ function Bars:DelayFeedback(bar)
 	-- Spark: the tick joins the delay color, restored with the fade
 	-- (FadeFillBack's final step re-applies the fill style).
 	bar.pip:SetVertexColor(DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3])
-	-- The burst fires backward: against the fill's direction of travel.
-	FireBurst(bar, DELAY_TINT, not ForwardIsLeft())
+	-- The burst is the anti-pop: same trailing anchor as the mode's haste
+	-- pop, scale inverted - the bar flinches back instead of lunging
+	-- forward - while the streak still flies backward, against the fill's
+	-- direction of travel.
+	FireBurst(bar, DELAY_TINT, not ForwardIsLeft(), true)
 	if bar.delayGlow and bar.delayGlowFade and not bar.delayGlowFade:IsPlaying() then
 		bar.delayGlow:Show()
 		bar.delayGlowFade:Play()
