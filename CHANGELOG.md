@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial v1 for WoW: Forever: main-hand, off-hand and ranged swing bars driven
   by the embedded LibClassicSwingTimerAPI, with combat feedback modeled on the
   12.x casting bar - a cast clip tints the fill red, shakes the bar and flashes
-  an outer glow; a parry-haste shortening pops the bar with a green glow; a
+  an outer glow; a parry-haste shortening bursts the bar to the right with
+  a green speed streak fired from the fill's edge, plus a green halo behind
+  the bar; a
   movement-delayed Auto Shot tints the bar amber; a paused swing gets a paused
   tint; a queued next-melee ability (Heroic Strike, Cleave, Raptor Strike,
   Maul) tints the main-hand fill the cast bar's yellow. Plus an optional
