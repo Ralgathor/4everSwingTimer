@@ -3,6 +3,9 @@
 *.tar.gz
 *.7z
 
+/ref/**
+.agents/**
+
 # BigWigs packaging
 /Libs/**
 .release/**
