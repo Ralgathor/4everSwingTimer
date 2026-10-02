@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `docs/ASSET_LIBRARY.md`: a curated catalog of client-side assets the addon
+  can draw on — bar fills, chrome, tick/spark/glow art, client fonts,
+  settings-panel bits — each tagged by verification status (in use /
+  Forever-verified via the `ref/` addons / research), plus a paste-ready
+  `AssetLibrary` Lua table with `AtlasOK`/`ApplyAsset` helpers that guard
+  every atlas lookup so a renamed client atlas degrades to fallback art.
+  Documentation only; not shipped in the package (the packager ignores
+  `docs`).
+
 ## [1.0.0-beta3] - 2026-10-01
 
 ### Added

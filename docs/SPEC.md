@@ -52,9 +52,19 @@ verification surface; see the status note.)
 
 ### Non-goals (v1)
 
-- **Target swing bars.** Forever has no data source (§1, §4.4), and v1 stays
-  player-only. A target-bar feature would require the classic-flavor support
-  the Forever-only scope dropped; revisit only if the addon ever re-expands.
+- **Target swing bars.** v1 stays player-only. The original rationale - Forever
+  has no data source (§1, §4.4), so a target-bar feature would require the
+  classic-flavor support the Forever-only scope dropped - is **superseded
+  (amended 2026-10-01)**: the library's own findings (`FOREVER_API_FINDINGS.md`
+  section 8, reopened 2026-09-25) concluded that the target's swings can be
+  inferred from the `UNIT_COMBAT` hits and misses the player receives, as a
+  heuristic with documented failure modes, and LaryIsland's Swing Timer now
+  ships one (section 10.4). The non-goal stands for v1 on scope grounds: that
+  model is single-target, sees only swings aimed at the player, and is a large
+  inference layer (interval learning, dual-wield detection, parry haste). If
+  built, it belongs in the library (section 10.5), gated on the library's open
+  item 10 (the `PLAYER_SWING` player-only isolation test); the addon would only
+  render it. Revisit as a post-1.0 candidate, not on flavor re-expansion.
 - Parry-haste prediction, mid-swing rescale, or any second-guessing of the library's
   state. The bar mirrors the library; the library owns the model.
 - WeakAuras emulation, combat log reconstruction, or direct `PLAYER_SWING` handling.
@@ -411,9 +421,9 @@ wrong by design.
 | Incumbent feature | In 4everSwingTimer? | Rationale |
 |---|---|---|
 | MH/OH/ranged bars with weapon gating | v1 (already spec'd) | Universal across all incumbents and the native bar. |
-| Target swing bars | Deferred | Proven demand (WST's headline feature), but no Forever data source and the classic-flavor scope was dropped. |
-| Hunter "white window" (YaHT) movement state | v1.1 candidate | On Forever a mid-swing ranged UPDATE is the FAILED_QUIET reschedule — a "delayed/retry" tint is derivable addon-side with no library change; the full white-window model needs cast-window data the library does not expose yet. |
-| Queued-attack coloring (HS/Cleave) | v1.1 candidate, probe-gated | `C_Spell.IsCurrentSpell` addon-side (EllesmereUI precedent, base IDs 78/845/6807); unprobed on Forever, may be restriction-affected. |
+| Target swing bars | Deferred | Proven demand (WST's headline feature). Originally "no Forever data source"; amended 2026-10-01: `UNIT_COMBAT` inference is feasible (library findings section 8, shipped by LaryIsland, section 10.4), so the deferral is now on scope and cost, not feasibility; library scope if built (10.5). |
+| Hunter "white window" (YaHT) movement state | Partly shipped (1.0.0-beta1) | The "delayed/retry" part shipped as the amber delay treatment on the FAILED_QUIET reschedule, addon-side with no library change; the full white-window model still needs cast-window data the library does not expose yet. |
+| Queued-attack coloring (HS/Cleave) | Shipped (1.0.0-beta1) | `C_Spell.IsCurrentSpell` addon-side, probe-verified on the beta (plain booleans, true with Heroic Strike queued); base IDs 78/845/2973/6807 (Raptor Strike added). Open: LaryIsland passes every rank explicitly, we rely on ranks resolving through the base ID - probe with a high-rank Heroic Strike queued (section 10.5). |
 | GCD spark (1.5s ahead of swing) | Rejected on Forever; not v1 anywhere | Cooldown timings are secret values in restricted content (§4.2); on classic flavors WeakAuras covers this. |
 | Latency compensation (SuperSwingTimer, SwedgeTimer) | Rejected | The library's PLAYER_SWING anchoring is event-accurate; latency math adds complexity for no accuracy gain. |
 | Per-class implementations (SwedgeTimer) | Rejected | The library centralizes swing mechanics; class logic in the addon would duplicate it and drift. |
@@ -421,6 +431,91 @@ wrong by design.
 | Native-style skin via shipped atlases | Yes — new default skin | Section 10.1. |
 | Visibility modes Always/InCombat/Hidden | Yes — section 4.2 amended | Native naming and semantics. |
 | Off-hand "real weapon in slot" gating | v1 via library events | The lib only fires off-hand events when dual wielding; AppelSwingsForever discovered the same edge independently. |
+
+### 10.4 Code-level benchmark (2026-10-01)
+
+Five addons read from source (`ref/`, research copies, not shipped):
+ForeverSwing, AppelSwingsForever, BetterSwingTimer, LaryIsland's Swing Timer and
+WeaponSwingTimer SixxFix. Full write-up: `docs/BENCHMARK.md`. What it changes
+here:
+
+- **Positioning confirmed.** Every reference that runs on Forever re-anchors on
+  `PLAYER_SWING` or mirrors the native bar that does; none shows a cast reset,
+  pause, clip or reschedule before the next swing. The stale/parked-swing
+  handling (parked login seed, stale sweep) is not a differentiator - it guards
+  against failure modes of the library's own model that raw-event addons never
+  have.
+- **Enemy swings: first shipped implementation.** LaryIsland infers the
+  target's swings from `UNIT_COMBAT` on the player (swing actions only,
+  median-of-5 interval learning, dual-wield detection, 40%/20% parry haste).
+  Feasibility was not new - the library's findings had reopened it on
+  2026-09-25 - but LaryIsland adds mitigations the library plan lacks for its
+  documented failure modes: attacker counting from nameplates, tanking/threat
+  checks, damage-strength hand assignment. The deferral stands on scope.
+- **Nothing new on the native side.** BetterSwingTimer reads the native frames'
+  `swingDuration`/`swingEndTime` and calls
+  `C_SwingTimer.IsTargetWithinSwingRange`; both are already covered by 10.1. The
+  fields hold per-swing re-anchoring only, and the range query/event are dead on
+  this build.
+- **If profiles ever enter scope** (still a section 2 non-goal): LaryIsland's
+  export uses the client's own `C_EncodingUtil` (CBOR + compression + base64,
+  non-default values only) - no serializer code to own.
+
+### 10.5 Triage: addon scope vs library scope (2026-10-01)
+
+Every item flagged by the benchmark, checked against LibClassicSwingTimerAPI
+at the pinned tag (v2.2.0-beta4, LibStub MINOR 36; line references below are
+to `LibClassicSwingTimerAPI.lua` at that tag). Rule applied: swing *state*
+belongs to the library (section 2: the addon holds no swing math); the addon
+owns presentation and the client-UI queries the library has declined to wrap.
+
+Closed by the library review - no action:
+
+| Item | Finding |
+|---|---|
+| `PLAYER_SWING` duration secrecy | Probe-verified plain even in restricted content; the library guards it anyway (579-596). Not a probe item. |
+| Parry haste (40%/20% rule) | Implemented for the player's own parries via `UNIT_COMBAT`, engine-verified on build 70124 with a 0.65 s event-skew correction (413-476). Target-side parry haste only comes with an enemy model. |
+| Swing-reset spell tables (WeaponSwingTimer) | Nothing to import: on Forever any completed cast outside `noreset_swing_spells` resets the swing, and the Classic tables share WeaponSwingTimer's lineage. Slam stays with library IMPROVEMENT_PLAN 6a / M1. |
+| Native frame fields, `C_SwingTimer` range API | Rejected (10.1): per-swing re-anchoring only; range query and event dead on this build. |
+
+Addon scope:
+
+| Item | Decision |
+|---|---|
+| Queued highlight rank coverage | Probe `C_Spell.IsCurrentSpell(78)` with a high-rank Heroic Strike queued. If it returns false, mirror the library's full rank list (`next_melee_spells`, 1167-1197) in `QUEUED_SPELLS`. Stays addon-side: the library deferred exposing queue state as public API (library IMPROVEMENT_PLAN). |
+| In-chat live swing log (ASF `/asf log`, LST `/lst probe`) | Candidate, low priority: a chat mirror of the existing `trace` capture for user support. |
+| Auto Shot clip readout (ASF) | Candidate, low priority, hunter-only: derivable from the library's ranged START times, no library change. |
+| Pixel-grid layer (ASF) | Parked unless the native skin shows seams. |
+| `C_DurationUtil` engine-timer fill (FS) | Rejected: it would replace only the per-frame `SetValue`. `Bars:OnUpdate` still has to position the tick by hand (`UpdateTickPosition` reads `GetValue()`, unverified against an engine-animated value), render the countdown/speed text and run the stale-landing check, while every library UPDATE, the parked state and test mode would need to re-issue `SetTimerDuration`. FS's main motive - animating a secret duration unread - does not apply: the library hands over plain numbers. Reopen only if the hand-placed tick and per-frame text go away. |
+| Profiles / export | Stays a section 2 non-goal; the `C_EncodingUtil` route (10.4) is the reference if that changes. |
+| Paladin seal icon (FS) | Parked: aura display, outside the addon's purpose (section 1: render the library's swing state). On Forever its in-combat path reduces to "last seal cast + learned duration" unless the by-name aura probe below succeeds, and that fallback cannot see a seal consumed early. |
+| Paladin seal-twist marker (WST) | Post-1.0 candidate, low priority: a marker a fixed lead time (WST: 0.4 s) before the main-hand landing, derivable from the library's expiration alone - no aura data, no library change. Paladin-only option, off by default. |
+
+Library scope (to file in the library repo; the addon changes only if the
+library's events change):
+
+| Item | Decision |
+|---|---|
+| Melee swing restarts the ranged reload (ASF claim) | Probe-gated. Not modeled: on Forever the ranged swing anchors only on `PLAYER_SWING` type 2 (584-641). If the probe confirms it, the ranged expiry is wrong after every melee swing on a hunter in melee. |
+| Enemy swing inference | Deferred (section 2). Natural home is the library's existing target unit, with `UNIT_COMBAT` already registered (today it drops everything but the player, 648-653). Gated on library open item 10; LaryIsland is the reference for the mitigations. |
+| Auto Shot windup / cast window (ASF, LST, WST) | Needs the library to expose its internal `autoShotCastTime` (computed at 233 and 1011, not in the public API) before any addon display. Matches the 10.3 white-window row. |
+| Other dynamic-haste sources | Already tracked by the library (HASTE_APPLICATION_FINDINGS open item 1): only Slice and Dice rank 1 rescales mid-swing on Forever (1151-1153); the `UNIT_ATTACK_SPEED` rescale is disabled there (676-710). |
+| Target-unit events on Forever (found in this review) | `UNIT_SPELLCAST_*` is registered for "target", so a completed mob cast takes the cast-reset path and fires `UNIT_SWING_TIMER_START("target")` from the target-changed seed speed, with no `PLAYER_SWING` anchor behind it (790-799). This addon filters non-player units (`Bars.lua`, the library-callback `Handle`); other consumers see partial target swings. Low priority: gate on Forever or document. |
+| `GetRangedBaseSpeed` caches a string (found in this review) | `speed = match` (289) stores the tooltip capture as a string; arithmetic works only through Lua coercion. Wrap in `tonumber`. |
+| Mid-combat aura presence via `C_UnitAuras.GetAuraDataBySpellName` (FS seal icon) | Probe-gated lead. The library closed its aura investigation with `GetPlayerAuraBySpellID` nil and `GetAuraDataByIndex` throwing mid-combat (HASTE_APPLICATION_FINDINGS, 2026-09-30); the by-name call was never probed, and FS's code claims it still answers in combat. If it returns presence mid-combat, aura state becomes a library signal again: proc hastes that fire no cast (Flurry), Maelstrom Weapon (IMPROVEMENT_PLAN), Seal of the Crusader. If it returns nil or throws, record it as the last aura call closed. |
+
+Probes for the next in-game session:
+
+1. High-rank Heroic Strike queued, `C_Spell.IsCurrentSpell(78)` (addon).
+2. Melee swing restarts the ranged reload (library).
+3. Library open item 10, the `PLAYER_SWING` player-only isolation test (library;
+   gates any enemy-swing work).
+4. Slice and Dice rank 2 (6774) haste factor (library, already listed).
+5. Slam (already in M1).
+6. `C_UnitAuras.GetAuraDataBySpellName("player", "<buff name>", "HELPFUL")`
+   mid-combat with a known buff up (Slice and Dice, Devotion Aura or a seal),
+   in open world: presence returned, nil, or throw - and whether its
+   `expirationTime` is secret (library; reopens or closes aura presence).
 
 ## 11. Roadmap and sequencing (decided 2026-09-28)
 
@@ -457,4 +552,7 @@ Sequencing rationale:
 Explicitly deferred past this cycle (no re-litigating): library Phase 3 (classic
 ranged accuracy via Auto Shot cooldown), the BCC divergence-guard probe, and the
 addon v1.1 candidates (ranged delayed/retry tint, queued-attack coloring,
-out-of-range dimming) plus target bars (deferred, section 10.3).
+out-of-range dimming) plus target bars (deferred, section 10.3). Status
+2026-10-01: the delayed/retry tint and queued-attack coloring shipped early in
+1.0.0-beta1; out-of-range dimming stays blocked upstream (10.1); target bars
+stay deferred, now on scope rather than feasibility (10.4).
