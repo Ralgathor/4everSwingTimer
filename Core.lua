@@ -9,8 +9,9 @@
 local ADDON_NAME = "4everSwingTimer"
 local LIB_MAJOR = "LibClassicSwingTimerAPI"
 -- The Forever swing path shipped with the library's 2.2.0 beta line; the
--- embedded pin is v2.2.0-beta4 (LibStub MINOR 36, the parked login seed).
-local REQUIRED_LIB_MINOR = 36
+-- embedded pin is the v2.2.0 stable release (LibStub MINOR 37: the parked
+-- login seed, plus the parked death reset and the stale-delta guard).
+local REQUIRED_LIB_MINOR = 37
 
 FourEverSwingTimer = {}
 local Addon = FourEverSwingTimer

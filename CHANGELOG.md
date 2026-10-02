@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta4] - 2026-10-02
+
+### Changed
+
+- Embedded LibClassicSwingTimerAPI bumped from v2.2.0-beta4 to the v2.2.0
+  stable release (LibStub MINOR 37; `REQUIRED_LIB_MINOR` follows). For this
+  addon: with the delta text enabled, the off-hand bar no longer shows a
+  meaningless delta (e.g. `-21.63s`) for a few seconds after the attack is
+  toggled on - the library now reports a delta only while both hands are
+  swinging. The library's death reset also parks each stopped hand before
+  its STOP (the bars already followed the STOP, so nothing changes on
+  screen). The library release closes its Forever verification items:
+  dual-wield off-hand anchoring and the death reset verified on the Forever
+  beta, plus a Classic Era regression pass.
+
 ### Added
 
 - `docs/ASSET_LIBRARY.md`: a curated catalog of client-side assets the addon
