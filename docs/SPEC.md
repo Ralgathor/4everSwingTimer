@@ -488,7 +488,7 @@ Addon scope:
 | Pixel-grid layer (ASF) | Parked unless the native skin shows seams. |
 | `C_DurationUtil` engine-timer fill (FS) | Rejected: it would replace only the per-frame `SetValue`. `Bars:OnUpdate` still has to position the tick by hand (`UpdateTickPosition` reads `GetValue()`, unverified against an engine-animated value), render the countdown/speed text and run the stale-landing check, while every library UPDATE, the parked state and test mode would need to re-issue `SetTimerDuration`. FS's main motive - animating a secret duration unread - does not apply: the library hands over plain numbers. Reopen only if the hand-placed tick and per-frame text go away. |
 | Profiles / export | Stays a section 2 non-goal; the `C_EncodingUtil` route (10.4) is the reference if that changes. |
-| Paladin seal icon (FS) | Parked: aura display, outside the addon's purpose (section 1: render the library's swing state). On Forever its in-combat path reduces to "last seal cast + learned duration" unless the by-name aura probe below succeeds, and that fallback cannot see a seal consumed early. |
+| Paladin seal icon (FS) | Parked: aura display, outside the addon's purpose (section 1: render the library's swing state). On Forever its in-combat path reduces to "last seal cast + learned duration" (the by-name probe resolved dark in combat, 2026-10-04), and that fallback cannot see a seal consumed early. |
 | Paladin seal-twist marker (WST) | Post-1.0 candidate, low priority: a marker a fixed lead time (WST: 0.4 s) before the main-hand landing, derivable from the library's expiration alone - no aura data, no library change. Paladin-only option, off by default. |
 
 Library scope (to file in the library repo; the addon changes only if the
@@ -497,25 +497,59 @@ library's events change):
 | Item | Decision |
 |---|---|
 | Melee swing restarts the ranged reload (ASF claim) | Probe-gated. Not modeled: on Forever the ranged swing anchors only on `PLAYER_SWING` type 2 (584-641). If the probe confirms it, the ranged expiry is wrong after every melee swing on a hunter in melee. |
-| Enemy swing inference | Deferred (section 2). Natural home is the library's existing target unit, with `UNIT_COMBAT` already registered (today it drops everything but the player, 648-653). Gated on library open item 10; LaryIsland is the reference for the mitigations. |
+| Enemy swing inference | Deferred (section 2). Natural home is the library's existing target unit, with `UNIT_COMBAT` already registered (today it drops everything but the player, 648-653). Gate (library open item 10) resolved 2026-10-04 - PLAYER_SWING confirmed player-only; LaryIsland is the reference for the mitigations. |
 | Auto Shot windup / cast window (ASF, LST, WST) | Needs the library to expose its internal `autoShotCastTime` (computed at 233 and 1011, not in the public API) before any addon display. Matches the 10.3 white-window row. |
 | Other dynamic-haste sources | Already tracked by the library (HASTE_APPLICATION_FINDINGS open item 1): only Slice and Dice rank 1 rescales mid-swing on Forever (1151-1153); the `UNIT_ATTACK_SPEED` rescale is disabled there (676-710). |
 | Target-unit events on Forever (found in this review) | `UNIT_SPELLCAST_*` is registered for "target", so a completed mob cast takes the cast-reset path and fires `UNIT_SWING_TIMER_START("target")` from the target-changed seed speed, with no `PLAYER_SWING` anchor behind it (790-799). This addon filters non-player units (`Bars.lua`, the library-callback `Handle`); other consumers see partial target swings. Low priority: gate on Forever or document. |
 | `GetRangedBaseSpeed` caches a string (found in this review) | `speed = match` (289) stores the tooltip capture as a string; arithmetic works only through Lua coercion. Wrap in `tonumber`. |
-| Mid-combat aura presence via `C_UnitAuras.GetAuraDataBySpellName` (FS seal icon) | Probe-gated lead. The library closed its aura investigation with `GetPlayerAuraBySpellID` nil and `GetAuraDataByIndex` throwing mid-combat (HASTE_APPLICATION_FINDINGS, 2026-09-30); the by-name call was never probed, and FS's code claims it still answers in combat. If it returns presence mid-combat, aura state becomes a library signal again: proc hastes that fire no cast (Flurry), Maelstrom Weapon (IMPROVEMENT_PLAN), Seal of the Crusader. If it returns nil or throws, record it as the last aura call closed. |
+| Mid-combat aura presence via `C_UnitAuras.GetAuraDataBySpellName` (FS seal icon) | Probe-gated lead. The library closed its aura investigation with `GetPlayerAuraBySpellID` nil and `GetAuraDataByIndex` throwing mid-combat (HASTE_APPLICATION_FINDINGS, 2026-09-30); the by-name call was never probed, and FS's code claims it still answers in combat. If it returns presence mid-combat, aura state becomes a library signal again: proc hastes that fire no cast (Flurry), Maelstrom Weapon (IMPROVEMENT_PLAN), Seal of the Crusader. If it returns nil or throws, record it as the last aura call closed. **Resolved 2026-10-04 (build 70205, SwingTestLog capture): verdict 2 - nil mid-combat including at the application instants, full plain data out of combat on the same aura instance; the last aura call closed (HASTE_APPLICATION_FINDINGS 7.1), the NeverSecret API ask the only remaining path.** |
+| `UNIT_AURA` change-edge inference (expiry-rescale timing, proc-application confirmation) | Probe-gated lead (2026-10-04): the event fires at every application/removal instant mid-combat while every data read stays dark; removal edges landed within 50 ms of the expected SnD expiry in the B4 capture, applications were simultaneous with their casts. Gated on mid-combat `C_UnitAuras.GetAuraCount` and `GetComboPoints` reads (library HASTE_APPLICATION_FINDINGS 7.1 item 4; SwingTestLog-automated, probe M1_SESSION_SCRIPT B5). If both are dark, the edge alone is too ambiguous; the NeverSecret API ask stays the only aura path. **Evening status (build 70205): `GetAuraCount` does not exist on this client (closed by nonexistence); `GetComboPoints` answered plain POSITIVE values mid-combat in the night session (`CP at-snd 1.000/2.000`, sec=false, auto-logged at the SnD cast instants) - the gate is open and the chain is captured end to end (cast 5837.353, CP 1 -> expected expiry 5846.353 -> fade edge at 0 ms). Implementable as filed; the Flurry half still needs its crit-instant capture. Family: SnD (cast-class, chain validated), Flurry (deterministic crit-trigger - the crit alone is the application signal, edge optional corroboration; capture pending for the engine rule and per-rank factor), Deadly Aspects / Quick Shots - Wowhead-Forever spell 19552 {ranged proc-class: swing-instant candidate generation via PLAYER_SWING type 2, anchor-confirmed within one shot - on-hit procs make the edge alone non-identifying, 2026-10-05 correction; fixed classic 12 s duration expiry, no CP dependency - capture M1_SESSION_SCRIPT B6}.** |
 
 Probes for the next in-game session:
 
 1. High-rank Heroic Strike queued, `C_Spell.IsCurrentSpell(78)` (addon).
 2. Melee swing restarts the ranged reload (library).
-3. Library open item 10, the `PLAYER_SWING` player-only isolation test (library;
-   gates any enemy-swing work).
+3. ~~Library open item 10, the `PLAYER_SWING` player-only isolation test~~ -
+   resolved (2026-10-04 session): no PLAYER_SWING while standing still under melee - player-only confirmed; enemy-swing inference is unblocked (still deferred on scope).
 4. Slice and Dice rank 2 (6774) haste factor (library, already listed).
 5. Slam (already in M1).
-6. `C_UnitAuras.GetAuraDataBySpellName("player", "<buff name>", "HELPFUL")`
+6. ~~`C_UnitAuras.GetAuraDataBySpellName("player", "<buff name>", "HELPFUL")` mid-combat aura presence~~ -
    mid-combat with a known buff up (Slice and Dice, Devotion Aura or a seal),
    in open world: presence returned, nil, or throw - and whether its
    `expirationTime` is secret (library; reopens or closes aura presence).
+   Probe script and verdict taxonomy: library docs/M1_SESSION_SCRIPT.md B4.
+   RESOLVED (2026-10-04, build 70205, SwingTestLog capture): verdict 2 -
+   nil mid-combat, including at the aura's application instants; full plain
+   data out of combat on the same aura instance. The last aura call closed
+   (library HASTE_APPLICATION_FINDINGS 7.1); the NeverSecret API ask is
+7. ~~`C_UnitAuras.GetAuraCount` and `GetComboPoints` mid-combat~~ -
+   resolved (2026-10-04 night, build 70205): `GetAuraCount` does not
+   exist on this client (closed by nonexistence); `GetComboPoints` answers
+   plain POSITIVE values mid-combat (`CP at-snd 1.000/2.000`, sec=false,
+   auto-logged at the SnD cast instants) - the gate is open and the
+   edge-inference chain is validated end to end mid-combat: cast 5837.353
+   with CP 1 -> 9 s duration (9+3(n-1), engine-verified) -> expected
+   expiry 5846.353 -> fade edge at 5846.353 exactly. Implementable per
+   library HASTE_APPLICATION_FINDINGS 7.1 item 4; the Flurry half still
+   needs its crit-instant capture.
+8. Deadly Aspects (Wowhead-Forever spell 19552, classic-era Quick
+   Shots) - the hunter Improved Aspect of the Hawk proc: ranged
+   proc-class dynamic haste, the third edge-inference family member
+   and the easiest expiry. Its application is only a CANDIDATE -
+   any on-hit effect (enchants, trinket procs) produces aura-gain
+   edges at swing instants, so swing+edge does not identify the
+   proc (2026-10-05 correction); the next PLAYER_SWING anchor's
+   plain speed settles the candidate within one shot (hasted =
+   real, unchanged = revert), with the fade edge at the expected
+   expiry as the temporal cross-check. Fixed classic 12 s duration,
+   no combo-point dependency. SwingTestLog captures it with no tool
+   change (M1_SESSION_SCRIPT B6, which now also measures the
+   false-candidate rate, and logs UNIT_ATTACK_SPEED - the ATKSPEED
+   lines have confirmed the fire at dynamic application AND expiry
+   instants (2026-10-05, build 70205, double-fire per change - dedupe);
+   the remaining question is the ranged-proc case, which this hunter
+   session settles; it also covers probe 2 (melee restarts ranged)
+   and the SPEC 7 item 4 checks.
 
 ## 11. Roadmap and sequencing (decided 2026-09-28)
 

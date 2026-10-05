@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- docs: SPEC 10.5 and the probe list updated from the 2026-10-04/05
+  investigation sessions (build 70205; the full record and evidence live in
+  the library repo: HASTE_APPLICATION_FINDINGS section 7.1 item 4, the
+  M1_SESSION_SCRIPT probes B4-B6, and docs/TRANSITION_PARITY_PLAN.md).
+  Resolved: probe 3 (PLAYER_SWING is player-only), probe 6 (by-name aura
+  presence is dark mid-combat), probe 7 (GetAuraCount does not exist;
+  GetComboPoints reads plain mid-combat) - which opened the
+  UNIT_AURA/UNIT_ATTACK_SPEED transition-parity lead, filed as probe 8 and
+  verified end to end on the rogue: SnD applications fire the attack-speed
+  event at the cast instant, fades fire mid-combat at the expiry,
+  refreshes fire nothing, and the fade fire is the fix for the one-swing
+  expiry lag. BENCHMARK's ForeverSwing seal caveat and section-8 item 10
+  updated to the resolved verdicts. Remaining captures: warrior (Flurry)
+  and hunter (Deadly Aspects).
+
+### Added
+
+- `GLOSSARY.md` at the repo root: the canonical ubiquitous language for
+  both repos (swing model, secrecy, event and signal taxonomy, capture
+  rig, project terms). One glossary exists today; a `GLOSSARY-MAP.md` is
+  added only if a second glossary ever appears.
+
 ## [1.0.0-beta4] - 2026-10-02
 
 ### Changed

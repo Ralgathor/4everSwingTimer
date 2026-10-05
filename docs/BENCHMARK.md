@@ -115,9 +115,12 @@ everywhere, cached last-known answers for combat-hidden values.
 
   Caveats: the library's probes found no aura channel mid-combat on
   Forever (`GetPlayerAuraBySpellID` returns nil, `GetAuraDataByIndex`
-  throws - library HASTE_APPLICATION_FINDINGS, 2026-09-30), but the
-  by-name call FS leans on was never probed, so FS's claim is open, not
-  refuted. If tier 1 is also dark, the in-combat display is tier 3 alone,
+  throws - library HASTE_APPLICATION_FINDINGS, 2026-09-30), and the
+  by-name call FS leans on was probed 2026-10-04 (SwingTestLog
+  capture, build 70205): nil in combat - at the aura's application
+  instants too - and full plain data out of combat; the claim is
+  refuted in combat. Tier 1 is dark, so the in-combat display is
+  tier 3 alone,
   which cannot see a seal ending early (a Judgement consuming it, under the
   classic rule) and dies wherever the player's cast spell IDs go secret
   (library open item 5). Seal names are matched as English strings
@@ -463,9 +466,11 @@ Ranked by relevance to 4everSwingTimer's roadmap:
 10. **Paladin seal tracking** (FS seal icon, WST seal-twist marker). Two
     parts worth separating. The *API lead*: FS claims
     `C_UnitAuras.GetAuraDataBySpellName` answers in combat where the
-    library found every other aura call dark. One `/run` probe settles
-    it, and a yes reopens aura presence as a library signal (Flurry and
-    other proc hastes, Maelstrom Weapon, Seal of the Crusader expiry).
+    library found every other aura call dark. Probed 2026-10-04
+    (SwingTestLog capture, build 70205): nil mid-combat, full plain
+    data out of combat - the answer is no; aura presence stays closed
+    in combat, and the library's NeverSecret API ask is the remaining
+    path (HASTE_APPLICATION_FINDINGS 7.1).
     The *feature*: a seal icon is aura display, outside this addon's
     purpose (render the library's swing state); WST's 0.4 s seal-twist
     marker is the swing-relative variant and needs only the library's
