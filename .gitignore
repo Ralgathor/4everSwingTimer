@@ -5,6 +5,8 @@
 
 /ref/**
 .agents/**
+.vibe/**
+.claude/**
 
 # BigWigs packaging
 /Libs/**
