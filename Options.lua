@@ -106,7 +106,7 @@ function Options:Init()
 	end
 	local palette, paletteOptions = ProxyString("flatPalette", "Flat bar colors", db.flatPalette, paletteEntries, ApplyAll)
 	Settings.CreateDropdown(category, palette, paletteOptions,
-		"Only applies to the Flat bar style (native uses the game's own art). Every palette stays clear of the effect colors (queued yellow, interrupt red, delay amber, haste green) so the effects always read.")
+		"Only applies to the Flat bar style (native uses the game's own art). Every palette stays clear of the effect colors (queued yellow, interrupt red, delay amber, haste teal) so the effects always read.")
 
 	local fill, fillOptions = ProxyString("fill", "Bar direction", db.fill, {
 		{ value = "drain", label = "Drain (full to empty)" },

@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rig, project terms). One glossary exists today; a `GLOSSARY-MAP.md` is
   added only if a second glossary ever appears.
 
+### Fixed
+
+- The "Flat bar colors" tooltip names the haste effect color teal (it read
+  "haste green" since the haste feedback moved to teal).
+
 ## [1.0.0-beta4] - 2026-10-02
 
 ### Changed
