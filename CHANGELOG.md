@@ -43,16 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dispatch instead of the fallback tree.
 
 - Embedded LibClassicSwingTimerAPI bumped from the v2.2.0 stable release
-  to v2.3.0-beta1 (LibStub MINOR 38; `REQUIRED_LIB_MINOR` follows). No
+  to v2.3.0 stable (LibStub MINOR 39; `REQUIRED_LIB_MINOR` follows). No
   consumer change: the library's new `reason` argument on START/UPDATE is
   appended after `hand`, past the arguments the bars read. The bump picks
   up the duplicate-dispatch fix (two embedded copies no longer fire every
   event twice), the swing-timer cancellation at PLAYER_ENTERING_WORLD /
   PLAYER_TARGET_CHANGED (no stray STOP cancelling a fresh swing), no
   target swings on Forever, the Multi-Shot / Aimed Shot no-reset for
-  weaving hunters, and the Rapid Fire mid-swing rescale. The library's own
-  changelog lists its Forever items as unverified in game on this beta
-  build; no in-game pass yet on this bump.
+  weaving hunters, and the Rapid Fire mid-swing rescale. The stable
+  release is the beta with no code changes, and the library verified the
+  load-bearing pieces in game on it: the reason argument, the
+  single-frame dispatch and the duplicate-dispatch two-copy test (an
+  addon embedding MINOR 37 loaded alongside) - so this addon's reason
+  dispatch now rides verified ground. Still unverified upstream: the
+  Multi-Shot / Aimed no-reset and the Rapid Fire rescale factor
+  (capture plan docs/M1_SESSION_SCRIPT.md B8).
 
 - docs: SPEC 10.5 and the probe list updated from the 2026-10-04/05
   investigation sessions (build 70205; the full record and evidence live in

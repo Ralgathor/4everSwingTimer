@@ -9,12 +9,13 @@
 local ADDON_NAME = "4everSwingTimer"
 local LIB_MAJOR = "LibClassicSwingTimerAPI"
 -- The Forever swing path shipped with the library's 2.2.0 beta line; the
--- embedded pin is the v2.3.0-beta1 release (LibStub MINOR 38: the event
+-- embedded pin is the v2.3.0 stable release (LibStub MINOR 39: the event
 -- reason argument, the single-frame dispatch with the shared frame, and
 -- the Forever fixes - no target swings, Multi-Shot/Aimed no-reset, Rapid
 -- Fire rescale, and the swing-timer cancellation at world enter/target
--- change).
-local REQUIRED_LIB_MINOR = 38
+-- change). The library verified the reason argument, the dispatch and
+-- the duplicate-dispatch two-copy test in game on this release.
+local REQUIRED_LIB_MINOR = 39
 
 FourEverSwingTimer = {}
 local Addon = FourEverSwingTimer
@@ -157,7 +158,7 @@ function Addon:OnEnable()
 		self:Print("LibClassicSwingTimerAPI is missing. Bars are disabled; the library ships embedded, so a reinstall should fix this.")
 		return
 	elseif minor < REQUIRED_LIB_MINOR then
-		self:Print("LibClassicSwingTimerAPI is too old (needs the 2.3.0-beta1 build). Bars are disabled until the library updates.")
+		self:Print("LibClassicSwingTimerAPI is too old (needs the 2.3.0 build). Bars are disabled until the library updates.")
 		return
 	end
 	self.lib = lib
