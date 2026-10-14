@@ -130,10 +130,12 @@ Bar behavior:
   detection covers those, so no flavor or version branch is needed.
 - Ranged dynamic haste: a successful dynamic-family cast (Rapid Fire-class)
   rescales the in-flight shot (library 2.2.0-beta3+); the ranged UPDATE's
-  shortened landing fires the same teal stack. The movement-reschedule
-  window keeps precedence - a ~0.5 s recast still reads as the amber delay,
-  so a rescale late in a short remaining swing can land inside it and read
-  as a reschedule.
+  shortened landing fires the same teal stack. With the library's reason
+  argument (2.3.0-beta1+) the UPDATE names its cause - "haste" fires the
+  teal pop, "movement" the amber delay - and the movement-reschedule
+  window is only the fallback classifier on builds without it; the
+  window-precedence misread (a rescale landing inside it) no longer occurs
+  on a reason-bearing build.
 
 ### 4.2 Visibility model
 
@@ -221,7 +223,7 @@ Library-level facts the addon must present honestly, not hide:
 | Constraint (verified) | Addon behavior |
 |---|---|
 | Library builds without the parry fix apply parry haste at the next swing, not mid-swing | Bar may overshoot after a player parry on those builds; self-corrects at next START. With the fix the bar re-anchors mid-swing and the teal stack fires at the parry. |
-| Weapon-speed changes never rescale an in-flight swing (dynamic-haste rescales do, library beta3+, on successful dynamic-family casts) | UPDATE mid-swing is rare by design; the reschedule window classifies the ~0.5 s retry as the amber delay, a shortened landing outside it fires the teal haste pop, and the bar follows the new expiry either way. |
+| Weapon-speed changes never rescale an in-flight swing (dynamic-haste rescales do, library beta3+, on successful dynamic-family casts) | UPDATE mid-swing is rare by design; the reason argument (2.3.0-beta1+) classifies the UPDATE outright ("movement" amber, "haste" teal), the reschedule window is only the fallback on builds without it, and the bar follows the new expiry either way. |
 | Target tracking unsupported | No target UI at all (non-goal in v1). |
 | Secret values in combat | Library-owned concern; the addon never reads `UnitAttackSpeed`/`UnitRangedDamage` directly, so nothing to guard. |
 | Off-hand dual-wield anchoring unverified in lib beta | The addon is the natural test rig: if OH never fires on a dual wielder, file upstream; the addon needs no change. |
@@ -374,9 +376,57 @@ Design borrowings for the addon:
   atlases — zero texture shipping cost, guaranteed present on the Forever
   client, instant familiarity. Custom flat styles remain as alternatives.
 - **Visibility model = the native three modes** (section 4.2, amended).
-- Optional **out-of-range dimming** as a v1.1 candidate: mirror the native
-  approach (query on `PLAYER_TARGET_CHANGED`, `EnableRangeCheck`), beta-flagged
-  since the event is broken; degrade to query-only. Probe 2026-09-28: the query returns nil with a target in melee range and out of range after EnableRangeCheck - blocked upstream entirely, event and query both dead on this beta build; revisit with the Blizzard report.
+- Optional **out-of-range dimming** as a v1.1 candidate. Probe verdict
+  (2026-10-14, build 70374, `/4everswingtimer proberange` on the paladin
+  AND the hunter; RANGEPROBE lines in the trace SavedVariables): the
+  native subsystem is class-dependent - DEAD on the paladin
+  (`IsTargetWithinSwingRange` nil with the target in and out of melee
+  after `EnableRangeCheck`, the event firing only its two initial pushes),
+  ALIVE on the hunter (the query returns real booleans for both hands and
+  the event fires on every range transition, third payload arg
+  `checksRange` following target validity). The split likely tracks the
+  ranged-weapon/Auto Shot context arming the subsystem; untested further.
+  The implementation reads the native query first - where it answers it
+  is authoritative (hunter probe: agreed with every fallback signal
+  sample-for-sample, dead zone exactly MH-in/RGD-out) - and a nil answer
+  falls through to the fallback probes (reading nil as out would stick a
+  dead-native character's bars dimmed forever): `C_Item.IsItemInRange`
+  band items flip cleanly against hostile targets (nil outside the band,
+  true inside; the mainline hostile-restriction caveat is answered),
+  `C_Spell.IsSpellInRange` reads true/nil, `CheckInteractDistance` real
+  booleans. All range probes answer nil (not false) when out of range -
+  nil means no answer, not out. Design: arm the native checks when the
+  feature is on, poll the target at ~0.2 s (one path covers the live-event
+  hunter and the dead-native paladin); melee hands read the native query
+  then a class melee-band ability, the ranged hand the native query then
+  the class's own ranged attack spell (hunter Auto Shot, wand classes
+  Shoot - the only probes that carry the dead zone; band items read
+  in-range inside the min range and mask it, as the level-5 hunter run
+  showed with the native query nil there), with the 30 yd band item only
+  the no-spell last resort; dead zone = melee in + ranged out. The
+  hunter has no working melee spell probe - both
+  candidates probe-verified useless (Wing Clip nil even at melee, Raptor
+  Strike true even at 30+ yd) - so its melee answer is the native query,
+  with CheckInteractDistance's duel distance (~9.9 yd, probe-verified
+  flipping live on the hunter) as the final generic fallback. Dead targets
+  gate to neutral: the second probe run showed the native query and every
+  range probe reading nil on a corpse while CheckInteractDistance reads
+  in-range. Presentation: while a state is active the fill takes the DELAY amber tint,
+  applied
+  through the base fill funnel so effect tints override the state and
+  fade back into it; the state word ("Too far" / "Too close", WHITE with a
+  black drop shadow) reads right AFTER the hand name - readable on
+  the dark parked-bar background and on the amber fill alike (red
+  proved unreadable on the dark background) - and the delta readout
+  yields its slot until the state clears. Entering a state plays the interrupt treatment's SHAKE once (the
+  PlayShake helper, shared with the interrupt so both use the exact
+  animation and ShakeStrengthUI gate): motion is the peripheral catch,
+  and the decaying sway reads without resizing the bar - the delay
+  anti-pop scaled it, which read unwanted in game. Entry only; clearing
+  the state is its own confirmation. The in-game verdict on the iterations: the red
+  interrupted ART too flashy, the muted grey art not catchable
+  peripherally, the red word alone not working. With "Show label" off
+  only the hand name hides - the word is its own text and shows.
 - Fill direction stays configurable: default **drain** (classic addon
   convention, what the target audience is used to), with the native-style skin
   defaulting to fill-up to match the client's look.

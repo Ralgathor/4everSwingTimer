@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Internal cleanup, no behavior change: the range feedback's rationale had
+  accumulated across five overlapping comment blocks through the design
+  iterations; each topic now has one canonical comment (the fill greys with
+  their constants, the presentation with ApplyRangeState, the probe
+  evidence in SPEC 10.1 and here) and the pointers replace the duplicates.
+  The probe sample's target-status expression became an explicit branch
+  chain. Verified: syntax and a bytecode audit for nil-global reads both
+  clean, no code paths changed.
+
+- In-game finding (beta client 70374): a cast completing right after the
+  swing landed - the bar sitting at full - played no reset effect, because
+  the reason dispatch guarded the named-reset interrupt on the swing being
+  in flight and the reset START arrives with nothing in flight. A named
+  "reset" now plays the interrupt treatment regardless of bar state: the
+  swing is reset either way, and the bar restarting from empty is the
+  reset. "clip" keeps the guard (its STOP precedes the clip START, so the
+  CLIPPED event's treatment covers the parked case).
+
+- SwingStart now classifies feedback off the library's new `reason`
+  argument (2.3.0-beta1, LibStub MINOR 38): a named "reset"/"clip" START
+  fires the red interrupt, the combat-enter off-hand re-anchor ("attack")
+  stays quiet instead of flashing red on attack-toggle stutter, a named
+  "movement" ranged UPDATE fires the amber delay and a named
+  "haste"/"parry" UPDATE the teal pop. This removes the window-precedence
+  misread where a Rapid Fire-class rescale landing inside the 0.3-0.7 s
+  reschedule window read as a movement delay. The heuristics demote to the
+  fallback for library builds without the reason argument (below the gate's
+  MINOR 38 the bar is disabled entirely, so in practice they are defense
+  in depth); the stop-grace speed comparison keeps serving the
+  "swing"-reason and no-reason paths alike. The effect test morphs now
+  pass the real combat reasons, so the previews exercise the reason
+  dispatch instead of the fallback tree.
+
+- Embedded LibClassicSwingTimerAPI bumped from the v2.2.0 stable release
+  to v2.3.0-beta1 (LibStub MINOR 38; `REQUIRED_LIB_MINOR` follows). No
+  consumer change: the library's new `reason` argument on START/UPDATE is
+  appended after `hand`, past the arguments the bars read. The bump picks
+  up the duplicate-dispatch fix (two embedded copies no longer fire every
+  event twice), the swing-timer cancellation at PLAYER_ENTERING_WORLD /
+  PLAYER_TARGET_CHANGED (no stray STOP cancelling a fresh swing), no
+  target swings on Forever, the Multi-Shot / Aimed Shot no-reset for
+  weaving hunters, and the Rapid Fire mid-swing rescale. The library's own
+  changelog lists its Forever items as unverified in game on this beta
+  build; no in-game pass yet on this bump.
+
 - docs: SPEC 10.5 and the probe list updated from the 2026-10-04/05
   investigation sessions (build 70205; the full record and evidence live in
   the library repo: HASTE_APPLICATION_FINDINGS section 7.1 item 4, the
@@ -25,6 +70,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and hunter (Deadly Aspects).
 
 ### Added
+
+- Range feedback (new "Range feedback" checkbox, default off): the three-
+  state target-distance indicator from SPEC 10.1, probe-verified on both
+  probe characters (2026-10-14, build 70374). The probe runs split the
+  native C_SwingTimer subsystem by class: dead on the paladin (query nil
+  in and out of melee after EnableRangeCheck, event only its initial
+  pushes), alive on the hunter (query booleans for both hands, event
+  firing on every transition) - likely the ranged-weapon context arming
+  it. The bars read the native query first (`EnableRangeCheck` is armed
+  when the feature is on); a nil answer falls through to the fallback
+  probes - `C_Spell.IsSpellInRange`/`C_Item.IsItemInRange` at 0.2 s -
+  rather than reading as out, so a dead-native character's bars never
+  stick dimmed. Melee hands fall back to a class melee-band ability
+  (`Addon.RANGE_MELEE_SPELLS`, shared with the range probe command), then
+  CheckInteractDistance's duel distance; the hunter has NO working spell
+  probe - both candidates probe-verified useless on build 70374 (Wing Clip
+  nil even at melee, Raptor Strike true even at 30+ yd) - so the native
+  query is its melee answer and duel distance the fallback. Dead targets
+  gate to neutral: the second probe run showed the native query and every
+  range probe reading nil on a corpse while CheckInteractDistance reads
+  in-range, which would otherwise paint a dead target as melee-in. The
+  ranged hand falls back to the class's own ranged attack spell -
+  Auto Shot for hunters, Shoot for the wand classes - resolved once at
+  load, with the 30 yd band item only the no-spell last resort: the
+  level-5 hunter run showed the band item carries no dead zone (it reads
+  in-range inside the min range) and, with the native query nil on that
+  character, masked the close state entirely - out-of-range and
+  ranged-range worked while the dead zone stayed silent until the spell
+  probes took over.
+  Presentation: while a state is active the fill takes the DELAY amber
+  tint, applied through the base fill funnel (GetBaseFillColor/
+  ApplyFillStyle) so effect tints override the state and fade back
+  into it; the state word - "Too far" or "Too close", WHITE with a
+  black drop shadow - reads right AFTER the hand name ("Main Hand Too
+  far"), readable on the dark parked-bar background and on the amber
+  fill alike (red proved unreadable on the dark background), and the
+  delta readout yields its slot until the state clears.
+  Entering a state (or switching far/close) plays the interrupt
+  treatment's SHAKE once (the PlayShake helper, extracted so the
+  interrupt and the range entry share the exact animation and
+  ShakeStrengthUI gate): motion is the peripheral catch, and the decaying
+  sway reads without resizing the bar - the delay anti-pop scaled it,
+  which read unwanted in game. Entry only; clearing the state is its
+  own confirmation (the in-game verdict on the iterations: the red
+  interrupted ART too flashy, the muted grey art not catchable
+  peripherally, the red word alone not working). With "Show label" off only the hand name hides - the word
+  is its own text and shows. Friendly or absent targets and classes
+  without a melee probe keep the bars neutral.
+
+
+- `/4everswingtimer proberange`: an on-demand range-signal probe for the
+  swing-timer range question (SPEC 10.1's blocked out-of-range candidate).
+  While on, it polls once per second against the current target and prints
+  one sample line with every candidate signal: the native
+  `C_SwingTimer.IsTargetWithinSwingRange` query for the main-hand and
+  ranged hands (with `EnableRangeCheck` armed for both at start and
+  `PLAYER_SWING_RANGE_UPDATE` registered, each fire printed with its
+  payload), and the fallback signals the ref addons use -
+  `C_Spell.IsSpellInRange` on a melee-band class ability and Auto Shot,
+  `C_Item.IsItemInRange` on vanilla 10/15/20/30 yd band items, and
+  `CheckInteractDistance`'s duel distance. Every API is nil-guarded, so
+  missing ones read "gone"/"none" and the probe doubles as a census of
+  what exists on the current build. Signal changes record RANGEPROBE lines
+  into the trace SavedVariables (no recording gate), so the walk-in/walk-out
+  session persists for the range-indicator decision: native path if
+  Blizzard fixed the wiring, ref-addons' probe path otherwise.
+
 
 - `GLOSSARY.md` at the repo root: the canonical ubiquitous language for
   both repos (swing model, secrecy, event and signal taxonomy, capture

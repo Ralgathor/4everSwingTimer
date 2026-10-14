@@ -9,9 +9,12 @@
 local ADDON_NAME = "4everSwingTimer"
 local LIB_MAJOR = "LibClassicSwingTimerAPI"
 -- The Forever swing path shipped with the library's 2.2.0 beta line; the
--- embedded pin is the v2.2.0 stable release (LibStub MINOR 37: the parked
--- login seed, plus the parked death reset and the stale-delta guard).
-local REQUIRED_LIB_MINOR = 37
+-- embedded pin is the v2.3.0-beta1 release (LibStub MINOR 38: the event
+-- reason argument, the single-frame dispatch with the shared frame, and
+-- the Forever fixes - no target swings, Multi-Shot/Aimed no-reset, Rapid
+-- Fire rescale, and the swing-timer cancellation at world enter/target
+-- change).
+local REQUIRED_LIB_MINOR = 38
 
 FourEverSwingTimer = {}
 local Addon = FourEverSwingTimer
@@ -44,6 +47,7 @@ local DEFAULTS = {
 	showLabel = true,
 	showDelta = false,
 	highlightQueued = true,
+	rangeFeedback = false,
 	enabled = {
 		mainhand = true,
 		offhand = true,
@@ -153,7 +157,7 @@ function Addon:OnEnable()
 		self:Print("LibClassicSwingTimerAPI is missing. Bars are disabled; the library ships embedded, so a reinstall should fix this.")
 		return
 	elseif minor < REQUIRED_LIB_MINOR then
-		self:Print("LibClassicSwingTimerAPI is too old (needs the 2.2.0 Forever support). Bars are disabled until the library updates.")
+		self:Print("LibClassicSwingTimerAPI is too old (needs the 2.3.0-beta1 build). Bars are disabled until the library updates.")
 		return
 	end
 	self.lib = lib
@@ -243,6 +247,152 @@ function Addon:ToggleTrace()
 		or "Trace OFF.")
 end
 
+-- ---------------------------------------------------------------------------
+-- Range probe (/4everswingtimer proberange)
+-- ---------------------------------------------------------------------------
+
+-- Polls every candidate range signal against the current target once per
+-- second while on, printing one sample line per tick, so walking in and out
+-- of melee/ranged shows exactly which signals flip on this build:
+-- - the native C_SwingTimer subsystem: IsTargetWithinSwingRange for the
+--   main-hand and ranged hands, plus PLAYER_SWING_RANGE_UPDATE fires
+--   (EnableRangeCheck is armed for both hands at probe start; on the broken
+--   builds - 70009/70205, RANGE_API_BUG_REPORT.md in the library repo - it
+--   produced only the single initial push and the query read nil forever
+--   after);
+-- - the fallback signals the ref addons read on this client:
+--   C_Spell.IsSpellInRange on a melee-band ability and on Auto Shot,
+--   C_Item.IsItemInRange on vanilla range-band items, and
+--   CheckInteractDistance's duel distance.
+-- Missing APIs sample as "gone"/"none", so the probe is also a census of
+-- what exists. Every signal CHANGE records a RANGEPROBE line into the
+-- trace table (no recording gate - the probe owns its evidence), and each
+-- PLAYER_SWING_RANGE_UPDATE fire prints and records with its payload.
+local RANGE_PROBE_ITEMS = { 17626, 4559, 10645, 7734 } -- 10/15/20/30 yd bands
+local RANGE_PROBE_ITEM_YD = { 10, 15, 20, 30 }
+local RANGE_PROBE_TICK = 1.0
+
+local function ProbeValue(value)
+	if value == nil then
+		return "nil"
+	elseif value then
+		return "1"
+	end
+	return "0"
+end
+
+-- TraceRecord without the recording gate: the probe writes its own lines
+-- (changes and events only) whenever it runs.
+local function ProbeRecord(...)
+	local t = FourEverSwingTimerTrace
+	if not t then
+		return
+	end
+	local n = (t.n or 0) + 1
+	t.n = n
+	local parts = { "RANGEPROBE", string.format("%.3f", GetTime()) }
+	for i = 1, select("#", ...) do
+		parts[#parts + 1] = tostring((select(i, ...)))
+	end
+	t[n] = table.concat(parts, " ")
+end
+
+function Addon:RangeProbeSample()
+	local parts = {}
+	if not UnitExists("target") then
+		parts[#parts + 1] = "tgt:none"
+	else
+		-- The API may be absent on some clients: "?" keeps the probe a
+		-- census instead of erroring.
+		local status = "?"
+		if UnitIsDeadOrGhost then
+			status = UnitIsDeadOrGhost("target") and "dead" or "alive"
+		end
+		parts[#parts + 1] = "tgt:" .. status
+		if C_SwingTimer and C_SwingTimer.IsTargetWithinSwingRange then
+			parts[#parts + 1] = "MH:" .. ProbeValue(C_SwingTimer.IsTargetWithinSwingRange(0))
+			parts[#parts + 1] = "RGD:" .. ProbeValue(C_SwingTimer.IsTargetWithinSwingRange(2))
+		else
+			parts[#parts + 1] = "native:gone"
+		end
+		if C_Spell and C_Spell.IsSpellInRange then
+			if self.rangeProbeSpell then
+				local ok, value = pcall(C_Spell.IsSpellInRange, self.rangeProbeSpell, "target")
+				parts[#parts + 1] = "melee(" .. self.rangeProbeSpell .. "):" .. ProbeValue(ok and value or nil)
+			else
+				parts[#parts + 1] = "melee:none"
+			end
+			local ok, value = pcall(C_Spell.IsSpellInRange, "Auto Shot", "target")
+			parts[#parts + 1] = "autoshot:" .. ProbeValue(ok and value or nil)
+		else
+			parts[#parts + 1] = "spells:gone"
+		end
+		if C_Item and C_Item.IsItemInRange then
+			for i = 1, #RANGE_PROBE_ITEMS do
+				local ok, value = pcall(C_Item.IsItemInRange, RANGE_PROBE_ITEMS[i], "target")
+				parts[#parts + 1] = "i" .. RANGE_PROBE_ITEM_YD[i] .. ":" .. ProbeValue(ok and value or nil)
+			end
+		else
+			parts[#parts + 1] = "items:gone"
+		end
+		if CheckInteractDistance then
+			parts[#parts + 1] = "duel:" .. ProbeValue(CheckInteractDistance("target", 2))
+		end
+	end
+	parts[#parts + 1] = "ev:" .. (self.rangeProbeEvents or 0)
+	local line = table.concat(parts, " ")
+	self:Print(line)
+	if line ~= self.rangeProbeLast then
+		ProbeRecord(line)
+		self.rangeProbeLast = line
+	end
+end
+
+function Addon:ToggleRangeProbe()
+	self.rangeProbeOn = not self.rangeProbeOn
+	if self.rangeProbeOn then
+		FourEverSwingTimerTrace = FourEverSwingTimerTrace or {}
+		local _, class = UnitClass("player")
+		self.rangeProbeSpell = Addon.RANGE_MELEE_SPELLS and Addon.RANGE_MELEE_SPELLS[strlower(class or "")]
+		self.rangeProbeEvents = 0
+		self.rangeProbeLast = nil
+		if C_SwingTimer and C_SwingTimer.EnableRangeCheck then
+			-- Arm both hands first, mirroring the bug-report repro: the
+			-- initial state push (if wired) lands on the event below.
+			C_SwingTimer.EnableRangeCheck(0, true)
+			C_SwingTimer.EnableRangeCheck(2, true)
+			ProbeRecord("ARMED", "EnableRangeCheck", 0, 2)
+		else
+			ProbeRecord("ARMED", "C_SwingTimer", "gone")
+		end
+		if not self.rangeProbeFrame then
+			self.rangeProbeFrame = CreateFrame("Frame")
+			self.rangeProbeFrame:SetScript("OnEvent", function(_, event, ...)
+				Addon.rangeProbeEvents = (Addon.rangeProbeEvents or 0) + 1
+				local a, b, c = ...
+				ProbeRecord("EVENT", event, a, b, c)
+				Addon:Print("PLAYER_SWING_RANGE_UPDATE fired: " .. tostring(a) .. " " .. tostring(b) .. " " .. tostring(c))
+			end)
+		end
+		self.rangeProbeFrame:RegisterEvent("PLAYER_SWING_RANGE_UPDATE")
+		self.rangeProbeTicker = C_Timer.NewTicker(RANGE_PROBE_TICK, function()
+			Addon:RangeProbeSample()
+		end)
+		ProbeRecord("SESSION", GetBuildInfo())
+		self:Print("Range probe ON - target a hostile, walk in/out of melee and ranged range, read the sample lines. Same command stops it.")
+	else
+		if self.rangeProbeTicker then
+			self.rangeProbeTicker:Cancel()
+			self.rangeProbeTicker = nil
+		end
+		if self.rangeProbeFrame then
+			self.rangeProbeFrame:UnregisterEvent("PLAYER_SWING_RANGE_UPDATE")
+		end
+		ProbeRecord("OFF", "events", self.rangeProbeEvents or 0)
+		self:Print("Range probe OFF - " .. (self.rangeProbeEvents or 0) .. " PLAYER_SWING_RANGE_UPDATE fire(s) this run.")
+	end
+end
+
 
 SLASH_4EVERSWINGTIMER1 = "/4everswingtimer"
 SLASH_4EVERSWINGTIMER2 = "/everswing"
@@ -279,6 +429,8 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 		Addon.Bars:Debug()
 	elseif command == "trace" then
 		Addon:ToggleTrace()
+	elseif command == "proberange" then
+		Addon:ToggleRangeProbe()
 	elseif command == "reset" then
 		local defaults = Addon.DEFAULTS
 		Addon.db.point = defaults.point
@@ -289,7 +441,7 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 		Addon.Bars:RestorePosition()
 		Addon:Print("Position reset.")
 	elseif command == "help" then
-		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), unlock, lock, test [interrupt|haste|delay|queued|effects], debug, trace, reset, help")
+		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), unlock, lock, test [interrupt|haste|delay|queued|effects], debug, trace, proberange, reset, help")
 	else
 		Addon:Print("Unknown command: " .. command .. ". Try |cffdddddd/4everswingtimer help|r")
 	end

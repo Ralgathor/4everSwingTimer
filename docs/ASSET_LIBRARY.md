@@ -40,6 +40,7 @@ Verification legend:
 |---|---|---|---|
 | `ui-swingtimerbar-filling-mainhand` / `-offhand` / `-ranged` | atlas | in use | The native swing timer's own fills; the Native skin's fill source (`FILL_ATLAS` in Bars.lua). AppelSwingsForever presets confirm all three names. |
 | `ui-castingbar-filling-standard` | atlas | ref | The standard cast bar fill (AppelSwingsForever "Castbar" preset). Matches the cast-bar look the effect feedback already borrows. |
+| `ui-castingbar-interrupted` | atlas | ref | The cast bar's dedicated interrupted fill art (CastingBarFrame.lua, CastingBarType.Interrupted, painted white by the client - its red look is its own art, not a tint). Explored for the range states; not in use - the steady range indication is the red state word on the normal bar instead. |
 | `UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health` | atlas | ref | Modern unit-frame health fill (AppelSwingsForever "Retail" preset); clean flat gradient that vertex-tints well. |
 | `Interface\TargetingFrame\UI-StatusBar` | path | in use | The classic flat fill (`FLAT_TEXTURE`); the flat skin's base and LibSharedMedia's canonical "Blizzard" statusbar. |
 | `Interface\Buttons\WHITE8X8` | path | ref | Pure white 8x8 — a solid fill of any color via `SetVertexColor`, or a tintable glow square. Zero-art fallback of last resort. |

@@ -125,6 +125,15 @@ function Options:Init()
 		"While a next-melee ability (Heroic Strike, Cleave, Raptor Strike, Maul) is queued, the main-hand bar's fill takes the cast bar's yellow and the tick lights up with a glow. Works in both bar styles.")
 
 	Settings.CreateCheckbox(category,
+		ProxyBoolean(VAR_PREFIX .. "rangeFeedback", "Range feedback", db.rangeFeedback,
+			function() return db.rangeFeedback end,
+			function(value)
+				db.rangeFeedback = value
+				Addon.Bars:SetRangeFeedback(value)
+			end),
+		"Too far from your target, or inside the ranged dead zone (too close to fire): the bar's fill turns amber, a white state word appears after the hand name, and entering the state plays a one-shot shake - the interrupt treatment's own animation. Read from your target's distance; the beta client's range event is nonfunctional.")
+
+	Settings.CreateCheckbox(category,
 		ProxyBoolean(VAR_PREFIX .. "locked", "Locked", db.locked,
 			function() return db.locked end,
 			function(value)

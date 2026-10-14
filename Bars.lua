@@ -124,9 +124,9 @@ local DELAY_GLOW_TIME = 0.5
 -- in the treatment, so a permitted retrigger always starts from rest.
 local DELAY_RETRIGGER_WINDOW = 0.5
 -- The movement-reschedule recast window: the library measured real recasts
--- at 0.43-0.56 s, and the bounds are padded. SwingStart's ranged UPDATE
--- classification reads it; the haste preview's ranged morph stays clear of
--- it (see FireTestEffect).
+-- at 0.43-0.56 s, and the bounds are padded. Only SwingStart's ranged UPDATE
+-- fallback reads it - the reason argument classifies first, and this window
+-- exists to guess the reschedule signature on library builds without it.
 local RESCHEDULE_MIN = 0.3
 local RESCHEDULE_MAX = 0.7
 local TINT_HOLD = 0.45
@@ -568,6 +568,19 @@ local function CreateBar(hand)
 	bar.delta = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	bar.delta:SetPoint("LEFT", bar.label, "RIGHT", 8, 0)
 
+	-- The range state word: while a range state is active it reads right
+	-- AFTER the hand name - "Main Hand Too far" - anchored in the delta
+	-- slot (the delta readout hides while the word shows; out of range
+	-- the word outranks it). White with a black drop shadow, styled once
+	-- here: it must read on the dark parked-bar background, on the amber
+	-- state fill, and on any flat palette.
+	bar.rangeText = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	bar.rangeText:SetPoint("LEFT", bar.label, "RIGHT", 8, 0)
+	bar.rangeText:SetTextColor(1, 1, 1)
+	bar.rangeText:SetShadowColor(0, 0, 0, 1)
+	bar.rangeText:SetShadowOffset(1.5, -1.5)
+	bar.rangeText:Hide()
+
 	bar.time = bar.status:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	bar.time:SetPoint("RIGHT", bar.status, "RIGHT", -10, 0)
 	bar.time:SetText("0.0")
@@ -731,13 +744,11 @@ function Bars:ApplyFillStyle(bar)
 	end
 	local texture = bar.status:GetStatusBarTexture()
 	if texture then
-		if queued then
-			texture:SetVertexColor(QUEUED_TINT[1], QUEUED_TINT[2], QUEUED_TINT[3])
-		elseif db.skin == "native" then
-			texture:SetVertexColor(1, 1, 1)
-		else
-			texture:SetVertexColor(FlatColor(bar.hand))
-		end
+		-- One funnel for the base fill: queued keeps priority inside
+		-- GetBaseFillColor, and the effect fades land back on the same
+		-- computation.
+		local baseR, baseG, baseB = self:GetBaseFillColor(bar)
+		texture:SetVertexColor(baseR, baseG, baseB)
 	end
 	-- The glow trails to the tick's left (the cast bar's own anchor, +2px) -
 	-- no direction flip. UpdateTickPosition hides it when it would extend
@@ -746,8 +757,9 @@ function Bars:ApplyFillStyle(bar)
 	bar.queuedGlow:ClearAllPoints()
 	bar.queuedGlow:SetPoint("RIGHT", bar.pip, "LEFT", 2, 0)
 	-- One tick identity everywhere: the swing bar's own pip, height-scaled;
-	-- the queued state adds the fill tint, the yellow tick and the glow, not
-	-- a different tick.
+	-- the queued state tints it yellow with its glow. The range states keep
+	-- the normal pip - the red interrupted pip stays transient-only, part
+	-- of the real interrupt treatment.
 	ApplyPipSize(bar)
 	local glowW, glowH = GlowSize()
 	bar.queuedGlow:SetSize(glowW, glowH)
@@ -768,11 +780,18 @@ function Bars:ApplyFillStyle(bar)
 	self:UpdateTickPosition(bar)
 end
 
--- The base fill color an interrupt/delay tint fades back to.
+-- The base fill color an interrupt/delay tint fades back to, and the base
+-- ApplyFillStyle paints. A range state tints the fill the DELAY amber -
+-- the "your swing cannot land" family, not the interrupt's "your swing
+-- was cut" red - so a steady out-of-range bar and a real clip stay
+-- different colors.
 function Bars:GetBaseFillColor(bar)
 	local db = Addon.db
 	if db.highlightQueued and bar.queued then
 		return QUEUED_TINT[1], QUEUED_TINT[2], QUEUED_TINT[3]
+	end
+	if bar.rangeState then
+		return DELAY_TINT[1], DELAY_TINT[2], DELAY_TINT[3]
 	end
 	if db.skin == "native" then
 		return 1, 1, 1
@@ -824,6 +843,231 @@ function Bars:SetHighlightQueued(enabled)
 		self.queuedTestActive = false
 		bar.queued = false
 		self:ApplyFillStyle(bar)
+	end
+end
+
+-- ---------------------------------------------------------------------------
+-- Range feedback
+-- ---------------------------------------------------------------------------
+
+-- Class melee-band ability names (name-based so the client resolves the
+-- learned rank): the FALLBACK melee answer, read only where the native
+-- C_SwingTimer query answers nil (probe-split on build 70374: native
+-- alive on the hunter, dead on the paladin - SPEC 10.1 has the evidence).
+-- The hunter has no working spell probe (both candidates probe-verified
+-- useless), so its melee answer is the native query, with the duel
+-- distance below as the final fallback. Paladin's Hammer of Justice reads
+-- a 10 yd band, slightly beyond melee reach - the state lifts a touch
+-- early rather than late. Shared with the range probe command.
+Addon.RANGE_MELEE_SPELLS = {
+	warrior = "Heroic Strike",
+	paladin = "Hammer of Justice",
+	rogue = "Kick",
+	druid = "Maul",
+	shaman = "Earth Shock",
+	mage = "Arcane Explosion",
+	warlock = "Shadowflame",
+	priest = "Holy Nova",
+}
+local RANGE_POLL = 0.20
+-- The presentation: the fill takes the DELAY amber tint, the white state
+-- word reads after the hand name, and entering a state plays the
+-- interrupt treatment's shake - the peripheral catch. The iteration
+-- verdicts (grey art not catchable, word alone not working, the anti-pop
+-- resize unwanted) live in SPEC 10.1 and the changelog. Described with
+-- ApplyRangeState.
+local RANGE_RANGED_ITEM = 7734 -- 30 yd band item, the no-spell last resort
+-- The ranged attack spell per class, resolved once at load: these are the
+-- only probes that carry the DEAD ZONE (the min range) - the level-5 hunter
+-- run showed the band item reads in-range inside the dead zone (band items
+-- have no min range) and masks it entirely when the native query is nil
+-- there. Hunters always have Auto Shot; the wand classes have Shoot.
+local RANGE_RANGED_SPELLS = {
+	HUNTER = "Auto Shot",
+	PRIEST = "Shoot",
+	MAGE = "Shoot",
+	WARLOCK = "Shoot",
+}
+
+-- Every range API on this client answers nil when out of range or when the
+-- query cannot run - the probe read true/nil, never false - so nil must read
+-- as out, never as "keep the last state", or a dead-zone tint would stick
+-- after the target walks off. pcall guards spells the class has not learned
+-- and APIs a future client removes.
+local function SpellInRange(spell)
+	if not spell or not (C_Spell and C_Spell.IsSpellInRange) then
+		return false
+	end
+	local ok, value = pcall(C_Spell.IsSpellInRange, spell, "target")
+	return ok and value == true or false
+end
+
+local function ItemInRange(itemID)
+	if not (C_Item and C_Item.IsItemInRange) then
+		return false
+	end
+	local ok, value = pcall(C_Item.IsItemInRange, itemID, "target")
+	return ok and value == true or false
+end
+
+-- The interrupted-cast shake, shared by the interrupt treatment and the
+-- range states' entry catch: a decaying ~0.7 s sway (modeled on the
+-- client's InterruptShakeAnim), gated on the ShakeStrengthUI CVar - an
+-- absent CVar defaults to enabled, like the client's own shake.
+local function PlayShake(bar)
+	if not bar.shake then
+		return
+	end
+	local strength = tonumber(GetCVar("ShakeStrengthUI"))
+	if strength == nil or strength > 0 then
+		bar.shake:Stop()
+		bar.shake:Play()
+	end
+end
+
+-- The steady-state presentation: while a state is active the fill takes
+-- the DELAY amber tint through the base fill funnel (GetBaseFillColor/
+-- ApplyFillStyle, so effect tints override the state and fade back into
+-- it), plus the state word (bar.rangeText) reading right after the hand
+-- name - "Main Hand Too far" - WHITE with its black drop shadow (set at
+-- the word's creation: it must read on the dark parked-bar background,
+-- on the amber fill, and on any flat palette). The delta readout yields
+-- its slot while the word shows. Entering a state (or switching
+-- far/close) plays the interrupt treatment's SHAKE once (PlayShake):
+-- motion is the peripheral catch, and the sway reads without resizing
+-- the bar - the delay anti-pop scaled it (in-game preference) - while
+-- sharing the interrupt's exact animation and CVar gate. With "Show
+-- label" off only the hand name hides - the word is its own text and
+-- shows.
+local RANGE_FAR_TEXT = "Too far"
+local RANGE_CLOSE_TEXT = "Too close"
+function Bars:ApplyRangeState(bar, state)
+	if bar.rangeState == state then
+		return
+	end
+	bar.rangeState = state
+	if state then
+		bar.rangeText:SetText(state == "far" and RANGE_FAR_TEXT or RANGE_CLOSE_TEXT)
+		bar.rangeText:Show()
+		-- The word takes the delta's slot; the delta readout returns when
+		-- the state clears (the layout pass governs it otherwise).
+		bar.delta:Hide()
+	else
+		bar.rangeText:Hide()
+		bar.delta:SetShown(Addon.db.showDelta and bar.hand == "offhand")
+	end
+	self:ApplyFillStyle(bar)
+	if state then
+		-- After ApplyFillStyle: the shake lands on the freshly painted
+		-- amber base. Entry catch only - clearing the state is its own
+		-- confirmation (the bar returns to its normal colors).
+		PlayShake(bar)
+	end
+end
+
+-- Arm the native range checks for both hands: the native query only
+-- answers once EnableRangeCheck has been called (the probe armed it the
+-- same way before the hunter's queries went live). Harmless on characters
+-- the subsystem cannot answer (the paladin probe showed no ill effect).
+local function ArmRangeChecks()
+	if C_SwingTimer and C_SwingTimer.EnableRangeCheck then
+		C_SwingTimer.EnableRangeCheck(0, true)
+		C_SwingTimer.EnableRangeCheck(2, true)
+	end
+end
+
+-- Polled at RANGE_POLL: the native event is alive on some characters
+-- (hunter, build 70374) but polling covers both it and the dead-native
+-- characters with one path, at a rate the queue poll already established.
+-- With the feature off, no target, or a friendly target the bars return to
+-- the neutral state; a class without a melee probe keeps its melee bars
+-- neutral rather than stuck dimmed.
+function Bars:UpdateRangeFeedback()
+	local db = Addon.db
+	if not db.rangeFeedback
+		or not UnitExists("target")
+		or (UnitIsDeadOrGhost and UnitIsDeadOrGhost("target"))
+		or not (UnitCanAttack and UnitCanAttack("player", "target")) then
+		-- Neutral (no feedback) unless there is a live hostile target. A
+		-- DEAD target must gate here: the probe showed the native query
+		-- and every range probe reading nil on a corpse while
+		-- CheckInteractDistance reads in-range - the duel fallback below
+		-- would otherwise paint a dead target as melee-in.
+		for i = 1, #HAND_ORDER do
+			self:ApplyRangeState(self.bars[HAND_ORDER[i]], nil)
+		end
+		return
+	end
+	-- The native query first: where it answers it is authoritative (the
+	-- hunter probe showed it agreeing with every fallback signal
+	-- sample-for-sample, including the dead zone as MH-in/RGD-out); a nil
+	-- answer falls through to the fallback probes - reading nil as "out"
+	-- would stick the paladin's bars dimmed forever.
+	local nativeMelee
+	local nativeRanged
+	if C_SwingTimer and C_SwingTimer.IsTargetWithinSwingRange then
+		nativeMelee = C_SwingTimer.IsTargetWithinSwingRange(0)
+		nativeRanged = C_SwingTimer.IsTargetWithinSwingRange(2)
+	end
+	local meleeInRange = nativeMelee
+	if meleeInRange == nil then
+		meleeInRange = self.meleeSpell and SpellInRange(self.meleeSpell)
+	end
+	if meleeInRange == nil then
+		-- Duel distance (~9.9 yd), the final melee fallback: the hunter has
+		-- no working spell probe (both candidates probe-verified useless on
+		-- build 70374) and CheckInteractDistance is target-generic, reading
+		-- a band slightly wider than melee reach - like the paladin's
+		-- Hammer of Justice. False passes through (out is out); dead
+		-- targets are gated above.
+		if CheckInteractDistance then
+			meleeInRange = CheckInteractDistance("target", 2)
+		end
+	end
+	local rangedInRange = nativeRanged
+	if rangedInRange == nil then
+		if self.rangedSpell then
+			-- The class's own ranged attack spell: it carries the dead
+			-- zone, reading false inside the min range where every band
+			-- item reads in-range.
+			rangedInRange = SpellInRange(self.rangedSpell)
+		else
+			-- No ranged attack spell: the 30 yd band item is the last
+			-- resort. It carries no dead zone - the close state is then
+			-- undetectable and the bar reads only the item's band.
+			rangedInRange = ItemInRange(RANGE_RANGED_ITEM)
+		end
+	end
+	for i = 1, #HAND_ORDER do
+		local hand = HAND_ORDER[i]
+		local state
+		if hand == "ranged" then
+			if rangedInRange then
+				state = nil -- in range: no feedback
+			elseif meleeInRange then
+				state = "close" -- dead zone: too close for the shot
+			else
+				state = "far"
+			end
+		elseif meleeInRange == nil then
+			state = nil -- no class melee probe: no feedback
+		elseif not meleeInRange then
+			state = "far"
+		end
+		self:ApplyRangeState(self.bars[hand], state)
+	end
+end
+
+function Bars:SetRangeFeedback(enabled)
+	if enabled then
+		-- Arming is what makes the native query answer; the poll picks up
+		-- the state within RANGE_POLL.
+		ArmRangeChecks()
+	elseif self.bars then
+		-- Clear the state immediately on disable.
+		for i = 1, #HAND_ORDER do
+			self:ApplyRangeState(self.bars[HAND_ORDER[i]], nil)
+		end
 	end
 end
 
@@ -890,6 +1134,7 @@ function Bars:ApplyText()
 		bar.label:SetFont(BASE_FONT, fontHeight, "")
 		bar.time:SetFont(BASE_FONT, fontHeight, "")
 		bar.delta:SetFont(BASE_FONT, fontHeight, "")
+		bar.rangeText:SetFont(BASE_FONT, fontHeight, "")
 		bar.label:SetShown(db.showLabel)
 		bar.time:SetShown(db.showTime or db.showSpeed)
 		bar.delta:SetShown(db.showDelta and hand == "offhand")
@@ -1084,7 +1329,7 @@ end
 -- Library events
 -- ---------------------------------------------------------------------------
 
-function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
+function Bars:SwingStart(hand, speed, expirationTime, isUpdate, reason)
 	local bar = self.bars[hand]
 	if not bar then
 		return
@@ -1095,14 +1340,40 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 	bar.testSwing = nil
 	if not isUpdate then
 		local now = GetTime()
-		if bar.active and bar.expiration and bar.expiration > now + 0.05 then
-			-- A START while a swing is still in flight is the cast-completion
-			-- swing reset: the library restarts the swing with isReset=true,
+		local inFlight = bar.active and bar.expiration and bar.expiration > now + 0.05
+		if reason == "attack" then
+			-- The library's combat-enter off-hand re-anchor (reason argument,
+			-- MINOR 38+): the hand restarts without a cut. The fallback tree
+			-- below misreads an in-flight one as a cast reset and would flash
+			-- red on attack-toggle stutter; the named reason stays quiet.
+		elseif reason == "reset" then
+			-- A named reset plays the red interrupt treatment even on a
+			-- parked bar: the swing that just landed is gone either way, and
+			-- the bar restarting from empty IS the reset. The case that needs
+			-- it is a cast completing right after the swing landed (the bar at
+			-- full) - the reset START arrives with nothing in flight, and
+			-- guarding on inFlight hid the effect entirely.
+			self:InterruptFeedback(bar)
+		elseif reason == "clip" then
+			-- A clip lands with the bar parked (the STOP precedes the clip
+			-- START) and the CLIPPED event's own treatment covers it, so the
+			-- in-flight check here is only the unreachable safety net.
+			if inFlight then
+				self:InterruptFeedback(bar)
+			end
+		elseif inFlight then
+			-- Fallback, library builds without the reason argument: a START
+			-- while a swing is still in flight is the cast-completion swing
+			-- reset: the library restarts the swing with isReset=true,
 			-- which SUPPRESSES the STOP event (Unit:SwingStart), so no stop and
 			-- no CLIPPED ever reaches the addon on that path.
 			self:InterruptFeedback(bar)
 		elseif bar.stoppedInFlight and now - (bar.stoppedAt or 0) <= STOP_GRACE + 0.05 then
 			-- A START right after an in-flight stop: classify by weapon speed.
+			-- (A reason-bearing "swing" start is engine-confirmed, but the
+			-- speed comparison is what tells the hastened re-anchor from a
+			-- swap restart, so it serves the reason path and the fallback
+			-- alike.)
 			bar.stoppedInFlight = nil
 			local speedAtStop = bar.speedAtStop
 			local sameSpeed = speedAtStop and speed and math.abs(speed - speedAtStop) <= math.max(speedAtStop * 0.02, 0.01)
@@ -1122,27 +1393,45 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 		end
 	elseif hand == "ranged" then
 		if bar.active then
-			-- On WoW: Forever a mid-swing ranged UPDATE is either the
-			-- movement-cancelled Auto Shot reschedule - the engine re-attempts
-			-- the shot and the library predicts the next landing at
-			-- now + ~0.5 s (measured recasts 0.43-0.56 s); detect that
-			-- signature directly, comparing the new expiration against the
-			-- old one misses fails early in the cast window, where the
-			-- reschedule lands close to the original time and the push is
-			-- below the threshold - or a dynamic-haste rescale
-			-- (Rapid Fire-class) that shortens the in-flight shot.
-			local recast = expirationTime - GetTime()
-			if recast > RESCHEDULE_MIN and recast < RESCHEDULE_MAX then
+			if reason == "movement" then
+				-- The library's movement reason (MINOR 38+) names the
+				-- movement-cancelled Auto Shot reschedule outright: the
+				-- engine re-attempts the shot and the library predicts the
+				-- next landing at now + ~0.5 s. The window heuristic below
+				-- only exists because that signature had to be guessed; a
+				-- named rescale landing inside the window no longer
+				-- misreads as a delay.
 				self:DelayFeedback(bar)
-			elseif bar.expiration and expirationTime < bar.expiration then
-				-- A shortened landing outside the reschedule window: the
-				-- rescale case. The shot lands early - the same teal pop
-				-- the melee hands take for a parry or a melee haste proc.
-				-- The window keeps precedence (a rescale on a short
-				-- remaining swing can land inside it and reads as a
-				-- reschedule); an UPDATE that does not shorten stays
-				-- quiet.
+			elseif reason == "haste" then
+				-- A named dynamic-haste rescale (Rapid Fire-class): the
+				-- teal pop, even when the shortened landing falls inside
+				-- the fallback's reschedule window.
 				self:HasteFeedback(bar)
+			elseif not reason then
+				-- Fallback, library builds without the reason argument: on
+				-- WoW: Forever a mid-swing ranged UPDATE is either the
+				-- movement-cancelled Auto Shot reschedule - the engine
+				-- re-attempts the shot and the library predicts the next
+				-- landing at now + ~0.5 s (measured recasts 0.43-0.56 s);
+				-- detect that signature directly, comparing the new
+				-- expiration against the old one misses fails early in the
+				-- cast window, where the reschedule lands close to the
+				-- original time and the push is below the threshold - or a
+				-- dynamic-haste rescale (Rapid Fire-class) that shortens
+				-- the in-flight shot.
+				local recast = expirationTime - GetTime()
+				if recast > RESCHEDULE_MIN and recast < RESCHEDULE_MAX then
+					self:DelayFeedback(bar)
+				elseif bar.expiration and expirationTime < bar.expiration then
+					-- A shortened landing outside the reschedule window: the
+					-- rescale case. The shot lands early - the same teal pop
+					-- the melee hands take for a parry or a melee haste proc.
+					-- The window keeps precedence (a rescale on a short
+					-- remaining swing can land inside it and reads as a
+					-- reschedule); an UPDATE that does not shorten stays
+					-- quiet.
+					self:HasteFeedback(bar)
+				end
 			end
 		end
 	elseif bar.active then
@@ -1151,11 +1440,15 @@ function Bars:SwingStart(hand, speed, expirationTime, isUpdate)
 		-- defensive parry with the same weapon speed and a shortened expiry, and
 		-- on WoW: Forever nothing else produces a melee UPDATE (the attack-speed
 		-- rescale is gated off there and the pause spell list is empty). The
-		-- teal stack fires in real time at the parry; the early-landing
-		-- detection above remains the fallback for library builds without the
-		-- parry fix, where the hastened swing lands early and the stop-grace
-		-- logic classifies it.
-		self:HasteFeedback(bar)
+		-- reason argument names it ("parry"; a named rescale is "haste"), and an
+		-- unrecognized reason stays quiet rather than guessing; without a
+		-- reason the teal stack still fires in real time at the UPDATE. The
+		-- early-landing detection above remains the fallback for library builds
+		-- without the parry fix, where the hastened swing lands early and the
+		-- stop-grace logic classifies it.
+		if not reason or reason == "parry" or reason == "haste" then
+			self:HasteFeedback(bar)
+		end
 	end
 	bar.speed = speed
 	bar.expiration = expirationTime
@@ -1273,15 +1566,7 @@ function Bars:InterruptFeedback(bar)
 		bar.interruptGlow:Show()
 		bar.interruptGlowFade:Play()
 	end
-	if bar.shake then
-		-- Blizzard gates the shake on the ShakeStrengthUI CVar; an absent CVar
-		-- (client without the setting) defaults to enabled.
-		local strength = tonumber(GetCVar("ShakeStrengthUI"))
-		if strength == nil or strength > 0 then
-			bar.shake:Stop()
-			bar.shake:Play()
-		end
-	end
+	PlayShake(bar)
 end
 
 -- A swing reset by a cast: the interrupted-cast treatment - the fill turns
@@ -1513,12 +1798,13 @@ function Bars:TestEffect(effect)
 end
 
 -- The treatments, landed on the bars' current state. On the fake test swing
--- each effect reproduces its real event signature through the detection
--- paths in SwingStart, so the bar state the preview shows is the state
--- combat produces: the interrupt restarts the swing (START while still in
--- flight), the haste shortens it (mid-swing UPDATE, same speed, earlier
--- expiry), the delay recasts it at the swing's landing (ranged UPDATE
--- inside the retry window). Each morphed hand's stop timer follows the
+-- each effect reproduces its real event signature through SwingStart's
+-- reason dispatch - the combat path on library 2.3.0+ (the heuristics stay
+-- the fallback for builds without the reason argument) - so the bar state the
+-- preview shows is the state combat produces: the interrupt restarts the
+-- swing (a "reset" START while still in flight), the haste shortens it (a
+-- "haste" mid-swing UPDATE), the delay recasts it at the swing's landing (a
+-- "movement" ranged UPDATE). Each morphed hand's stop timer follows the
 -- morphed swing, ending its preview on the natural landing. Bars that are
 -- not the test's own fake swings (a real combat swing, or a parked bar)
 -- get the plain treatment instead - test data never rewrites live state.
@@ -1534,10 +1820,10 @@ function Bars:FireTestEffect(effect)
 			if effect == "interrupt" then
 				if fake then
 					-- START while the swing is still in flight: the real
-					-- cast-reset signature. The detection fires the
+					-- cast-reset signature. The reason dispatch fires the
 					-- treatment and the bar restarts from the top with a
 					-- fresh full swing.
-					self:SwingStart(hand, TEST_SPEED, now + TEST_SPEED)
+					self:SwingStart(hand, TEST_SPEED, now + TEST_SPEED, false, "reset")
 					bar.testSwing = true
 					self:ArmTestStop(hand, TEST_SPEED)
 				else
@@ -1551,16 +1837,7 @@ function Bars:FireTestEffect(effect)
 					-- re-anchors at the early landing and completes sooner.
 					local remaining = bar.expiration - now
 					local shortened = math.max(remaining - TEST_HASTE_CUT, 0.1)
-					local nudge = RESCHEDULE_MAX + 0.05
-					if hand == "ranged" and shortened > RESCHEDULE_MIN - 0.05 and shortened < nudge then
-						-- Inside (or on the float edge of) the reschedule
-						-- window a ranged UPDATE would classify as a
-						-- movement delay. The proportional cut can only land
-						-- there while more swing remains than the window's
-						-- far edge, so the nudge never extends the swing.
-						shortened = nudge
-					end
-					self:SwingStart(hand, TEST_SPEED, now + shortened, true)
+					self:SwingStart(hand, TEST_SPEED, now + shortened, true, "haste")
 					bar.testSwing = true
 					self:ArmTestStop(hand, shortened)
 				else
@@ -1572,7 +1849,7 @@ function Bars:FireTestEffect(effect)
 					-- recast: the real movement-cancel retry. The bar had
 					-- completed, and re-anchors at the re-attempt's
 					-- landing.
-					self:SwingStart(hand, TEST_SPEED, now + TEST_DELAY_RECAST, true)
+					self:SwingStart(hand, TEST_SPEED, now + TEST_DELAY_RECAST, true, "movement")
 					bar.testSwing = true
 					self:ArmTestStop(hand, TEST_DELAY_RECAST)
 				else
@@ -1656,13 +1933,15 @@ function Bars:Enable(lib)
 
 	-- Library wiring, following the pattern from the library's own README:
 	-- one handler function per registered event, receiving (event, ...).
-	local function Handle(event, unitId, a, b, c)
+	local function Handle(event, unitId, a, b, c, d)
 		if unitId ~= "player" then
 			return
 		end
 		if event == "UNIT_SWING_TIMER_START" or event == "UNIT_SWING_TIMER_UPDATE" then
-			-- a = speed, b = expirationTime, c = hand
-			Bars:SwingStart(c, a, b, event == "UNIT_SWING_TIMER_UPDATE")
+			-- a = speed, b = expirationTime, c = hand, d = reason (the
+			-- library's start/update cause, MINOR 38+; nil on builds before
+			-- 2.3.0-beta1, where SwingStart's heuristics classify)
+			Bars:SwingStart(c, a, b, event == "UNIT_SWING_TIMER_UPDATE", d)
 		elseif event == "UNIT_SWING_TIMER_STOP" then
 			Bars:SwingStop(a)
 		elseif event == "UNIT_SWING_TIMER_PAUSED" then
@@ -1683,6 +1962,20 @@ function Bars:Enable(lib)
 	-- Queued next-melee highlight poll.
 	self.queueTicker = C_Timer.NewTicker(QUEUE_POLL, function()
 		Bars:UpdateQueued()
+	end)
+
+	-- Range feedback: the class probes are resolved once (the class never
+	-- changes); the poll itself early-returns while the feature is off or
+	-- no hostile target exists. Arming the native checks at load keeps the
+	-- native query answering across reloads.
+	local _, class = UnitClass("player")
+	self.meleeSpell = Addon.RANGE_MELEE_SPELLS[strlower(class or "")]
+	self.rangedSpell = RANGE_RANGED_SPELLS[class]
+	if Addon.db.rangeFeedback then
+		ArmRangeChecks()
+	end
+	self.rangeTicker = C_Timer.NewTicker(RANGE_POLL, function()
+		Bars:UpdateRangeFeedback()
 	end)
 
 	-- Stale-landing convergence must not depend on the anchor being shown:
