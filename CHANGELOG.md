@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Internal cleanup, no behavior change: the range feedback's rationale had
   accumulated across five overlapping comment blocks through the design
-  iterations; each topic now has one canonical comment (the fill greys with
-  their constants, the presentation with ApplyRangeState, the probe
-  evidence in SPEC 10.1 and here) and the pointers replace the duplicates.
+  iterations; each topic now has one canonical comment (the presentation with
+  ApplyRangeState, the signal evidence in SPEC 10.1 and here) and the
+  pointers replace the duplicates.
   The probe sample's target-status expression became an explicit branch
   chain. Verified: syntax and a bytecode audit for nil-global reads both
   clean, no code paths changed.
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CLIPPED event's treatment covers the parked case).
 
 - SwingStart now classifies feedback off the library's new `reason`
-  argument (2.3.0-beta1, LibStub MINOR 38): a named "reset"/"clip" START
+  argument (library 2.3.0, LibStub MINOR 39): a named "reset"/"clip" START
   fires the red interrupt, the combat-enter off-hand re-anchor ("attack")
   stays quiet instead of flashing red on attack-toggle stutter, a named
   "movement" ranged UPDATE fires the amber delay and a named
@@ -120,10 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which read unwanted in game. Entry only; clearing the state is its
   own confirmation (the in-game verdict on the iterations: the red
   interrupted ART too flashy, the muted grey art not catchable
-  peripherally, the red word alone not working). With "Show label" off only the hand name hides - the word
-  is its own text and shows. Friendly or absent targets and classes
-  without a melee probe keep the bars neutral.
-
+  peripherally, the red word alone not working). With "Show label"
+  off only the hand name hides - the word is its own text and shows.
+  Friendly or absent targets and classes without a melee probe keep
+  the bars neutral.
 
 - `/4everswingtimer proberange`: an on-demand range-signal probe for the
   swing-timer range question (SPEC 10.1's blocked out-of-range candidate).
@@ -141,7 +141,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into the trace SavedVariables (no recording gate), so the walk-in/walk-out
   session persists for the range-indicator decision: native path if
   Blizzard fixed the wiring, ref-addons' probe path otherwise.
-
 
 - `GLOSSARY.md` at the repo root: the canonical ubiquitous language for
   both repos (swing model, secrecy, event and signal taxonomy, capture
