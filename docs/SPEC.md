@@ -496,7 +496,7 @@ library's events change):
 
 | Item | Decision |
 |---|---|
-| Melee swing restarts the ranged reload (ASF claim) | Probe-gated. Not modeled: on Forever the ranged swing anchors only on `PLAYER_SWING` type 2 (584-641). If the probe confirms it, the ranged expiry is wrong after every melee swing on a hunter in melee. |
+| Melee swing restarts the ranged reload (ASF claim) | **Confirmed on the beta (2026-10-14), deferred until launch.** The forever-hunter wiki (Forever Beta Changes) and in-game play agree: melee attacks reset the ranged swing timer. It may be a beta bug (intent unclear), so it is not modeled until live behavior settles it. Until then the ranged expiry is wrong after every melee swing on a hunter in melee: on Forever the ranged swing anchors only on `PLAYER_SWING` type 2 (584-641). If it survives launch, the fix belongs in the library (restart ranged on a main-hand anchor while ranged is active), unless the engine fires a type 2 anchor at the reset. |
 | Enemy swing inference | Deferred (section 2). Natural home is the library's existing target unit, with `UNIT_COMBAT` already registered (today it drops everything but the player, 648-653). Gate (library open item 10) resolved 2026-10-04 - PLAYER_SWING confirmed player-only; LaryIsland is the reference for the mitigations. |
 | Auto Shot windup / cast window (ASF, LST, WST) | Needs the library to expose its internal `autoShotCastTime` (computed at 233 and 1011, not in the public API) before any addon display. Matches the 10.3 white-window row. |
 | Other dynamic-haste sources | Already tracked by the library (HASTE_APPLICATION_FINDINGS open item 1): only Slice and Dice rank 1 rescales mid-swing on Forever (1151-1153); the `UNIT_ATTACK_SPEED` rescale is disabled there (676-710). |
@@ -508,7 +508,8 @@ library's events change):
 Probes for the next in-game session:
 
 1. High-rank Heroic Strike queued, `C_Spell.IsCurrentSpell(78)` (addon).
-2. Melee swing restarts the ranged reload (library).
+2. ~~Melee swing restarts the ranged reload (library).~~ Confirmed on the
+   beta (2026-10-14); deferred until launch shows whether it is a beta bug.
 3. ~~Library open item 10, the `PLAYER_SWING` player-only isolation test~~ -
    resolved (2026-10-04 session): no PLAYER_SWING while standing still under melee - player-only confirmed; enemy-swing inference is unblocked (still deferred on scope).
 4. Slice and Dice rank 2 (6774) haste factor (library, already listed).
