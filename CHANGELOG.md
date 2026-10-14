@@ -7,73 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Internal cleanup, no behavior change: the range feedback's rationale had
-  accumulated across five overlapping comment blocks through the design
-  iterations; each topic now has one canonical comment (the presentation with
-  ApplyRangeState, the signal evidence in SPEC 10.1 and here) and the
-  pointers replace the duplicates.
-  The probe sample's target-status expression became an explicit branch
-  chain. Verified: syntax and a bytecode audit for nil-global reads both
-  clean, no code paths changed.
-
-- In-game finding (beta client 70374): a cast completing right after the
-  swing landed - the bar sitting at full - played no reset effect, because
-  the reason dispatch guarded the named-reset interrupt on the swing being
-  in flight and the reset START arrives with nothing in flight. A named
-  "reset" now plays the interrupt treatment regardless of bar state: the
-  swing is reset either way, and the bar restarting from empty is the
-  reset. "clip" keeps the guard (its STOP precedes the clip START, so the
-  CLIPPED event's treatment covers the parked case).
-
-- SwingStart now classifies feedback off the library's new `reason`
-  argument (library 2.3.0, LibStub MINOR 39): a named "reset"/"clip" START
-  fires the red interrupt, the combat-enter off-hand re-anchor ("attack")
-  stays quiet instead of flashing red on attack-toggle stutter, a named
-  "movement" ranged UPDATE fires the amber delay and a named
-  "haste"/"parry" UPDATE the teal pop. This removes the window-precedence
-  misread where a Rapid Fire-class rescale landing inside the 0.3-0.7 s
-  reschedule window read as a movement delay. The heuristics demote to the
-  fallback for library builds without the reason argument (below the gate's
-  MINOR 38 the bar is disabled entirely, so in practice they are defense
-  in depth); the stop-grace speed comparison keeps serving the
-  "swing"-reason and no-reason paths alike. The effect test morphs now
-  pass the real combat reasons, so the previews exercise the reason
-  dispatch instead of the fallback tree.
-
-- Embedded LibClassicSwingTimerAPI bumped from the v2.2.0 stable release
-  to v2.3.0 stable (LibStub MINOR 39; `REQUIRED_LIB_MINOR` follows). No
-  consumer change: the library's new `reason` argument on START/UPDATE is
-  appended after `hand`, past the arguments the bars read. The bump picks
-  up the duplicate-dispatch fix (two embedded copies no longer fire every
-  event twice), the swing-timer cancellation at PLAYER_ENTERING_WORLD /
-  PLAYER_TARGET_CHANGED (no stray STOP cancelling a fresh swing), no
-  target swings on Forever, the Multi-Shot / Aimed Shot no-reset for
-  weaving hunters, and the Rapid Fire mid-swing rescale. The stable
-  release is the beta with no code changes, and the library verified the
-  load-bearing pieces in game on it: the reason argument, the
-  single-frame dispatch and the duplicate-dispatch two-copy test (an
-  addon embedding MINOR 37 loaded alongside) - so this addon's reason
-  dispatch now rides verified ground. Still unverified upstream: the
-  Multi-Shot / Aimed no-reset and the Rapid Fire rescale factor
-  (capture plan docs/M1_SESSION_SCRIPT.md B8).
-
-- docs: SPEC 10.5 and the probe list updated from the 2026-10-04/05
-  investigation sessions (build 70205; the full record and evidence live in
-  the library repo: HASTE_APPLICATION_FINDINGS section 7.1 item 4, the
-  M1_SESSION_SCRIPT probes B4-B6, and docs/TRANSITION_PARITY_PLAN.md).
-  Resolved: probe 3 (PLAYER_SWING is player-only), probe 6 (by-name aura
-  presence is dark mid-combat), probe 7 (GetAuraCount does not exist;
-  GetComboPoints reads plain mid-combat) - which opened the
-  UNIT_AURA/UNIT_ATTACK_SPEED transition-parity lead, filed as probe 8 and
-  verified end to end on the rogue: SnD applications fire the attack-speed
-  event at the cast instant, fades fire mid-combat at the expiry,
-  refreshes fire nothing, and the fade fire is the fix for the one-swing
-  expiry lag. BENCHMARK's ForeverSwing seal caveat and section-8 item 10
-  updated to the resolved verdicts. Remaining captures: warrior (Flurry)
-  and hunter (Deadly Aspects).
-
 ### Added
 
 - Range feedback (new "Range feedback" checkbox, default off): the three-
@@ -147,12 +80,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rig, project terms). One glossary exists today; a `GLOSSARY-MAP.md` is
   added only if a second glossary ever appears.
 
+### Changed
+
+- Internal cleanup, no behavior change: the range feedback's rationale had
+  accumulated across five overlapping comment blocks through the design
+  iterations; each topic now has one canonical comment (the presentation with
+  ApplyRangeState, the signal evidence in SPEC 10.1 and here) and the
+  pointers replace the duplicates.
+  The probe sample's target-status expression became an explicit branch
+  chain. Verified: syntax and a bytecode audit for nil-global reads both
+  clean, no code paths changed.
+
+- In-game finding (beta client 70374): a cast completing right after the
+  swing landed - the bar sitting at full - played no reset effect, because
+  the reason dispatch guarded the named-reset interrupt on the swing being
+  in flight and the reset START arrives with nothing in flight. A named
+  "reset" now plays the interrupt treatment regardless of bar state: the
+  swing is reset either way, and the bar restarting from empty is the
+  reset. "clip" keeps the guard (its STOP precedes the clip START, so the
+  CLIPPED event's treatment covers the parked case).
+
+- SwingStart now classifies feedback off the library's new `reason`
+  argument (library 2.3.0, LibStub MINOR 39): a named "reset"/"clip" START
+  fires the red interrupt, the combat-enter off-hand re-anchor ("attack")
+  stays quiet instead of flashing red on attack-toggle stutter, a named
+  "movement" ranged UPDATE fires the amber delay and a named
+  "haste"/"parry" UPDATE the teal pop. This removes the window-precedence
+  misread where a Rapid Fire-class rescale landing inside the 0.3-0.7 s
+  reschedule window read as a movement delay. The heuristics demote to the
+  fallback for library builds without the reason argument (below the gate's
+  MINOR 38 the bar is disabled entirely, so in practice they are defense
+  in depth); the stop-grace speed comparison keeps serving the
+  "swing"-reason and no-reason paths alike. The effect test morphs now
+  pass the real combat reasons, so the previews exercise the reason
+  dispatch instead of the fallback tree.
+
+- Embedded LibClassicSwingTimerAPI bumped from the v2.2.0 stable release
+  to v2.3.0 stable (LibStub MINOR 39; `REQUIRED_LIB_MINOR` follows). No
+  consumer change: the library's new `reason` argument on START/UPDATE is
+  appended after `hand`, past the arguments the bars read. The bump picks
+  up the duplicate-dispatch fix (two embedded copies no longer fire every
+  event twice), the swing-timer cancellation at PLAYER_ENTERING_WORLD /
+  PLAYER_TARGET_CHANGED (no stray STOP cancelling a fresh swing), no
+  target swings on Forever, the Multi-Shot / Aimed Shot no-reset for
+  weaving hunters, and the Rapid Fire mid-swing rescale. The stable
+  release is the beta with no code changes, and the library verified the
+  load-bearing pieces in game on it: the reason argument, the
+  single-frame dispatch and the duplicate-dispatch two-copy test (an
+  addon embedding MINOR 37 loaded alongside) - so this addon's reason
+  dispatch now rides verified ground. Still unverified upstream: the
+  Multi-Shot / Aimed no-reset and the Rapid Fire rescale factor
+  (capture plan docs/M1_SESSION_SCRIPT.md B8).
+
+- docs: SPEC 10.5 and the probe list updated from the 2026-10-04/05
+  investigation sessions (build 70205; the full record and evidence live in
+  the library repo: HASTE_APPLICATION_FINDINGS section 7.1 item 4, the
+  M1_SESSION_SCRIPT probes B4-B6, and docs/TRANSITION_PARITY_PLAN.md).
+  Resolved: probe 3 (PLAYER_SWING is player-only), probe 6 (by-name aura
+  presence is dark mid-combat), probe 7 (GetAuraCount does not exist;
+  GetComboPoints reads plain mid-combat) - which opened the
+  UNIT_AURA/UNIT_ATTACK_SPEED transition-parity lead, filed as probe 8 and
+  verified end to end on the rogue: SnD applications fire the attack-speed
+  event at the cast instant, fades fire mid-combat at the expiry,
+  refreshes fire nothing, and the fade fire is the fix for the one-swing
+  expiry lag. BENCHMARK's ForeverSwing seal caveat and section-8 item 10
+  updated to the resolved verdicts. Remaining captures: warrior (Flurry)
+  and hunter (Deadly Aspects).
+
 ### Fixed
 
 - The "Flat bar colors" tooltip names the haste effect color teal (it read
   "haste green" since the haste feedback moved to teal).
 
 ## [1.0.0-beta4] - 2026-10-02
+
+### Added
+
+- `docs/ASSET_LIBRARY.md`: a curated catalog of client-side assets the addon
+  can draw on — bar fills, chrome, tick/spark/glow art, client fonts,
+  settings-panel bits — each tagged by verification status (in use /
+  Forever-verified via the `ref/` addons / research), plus a paste-ready
+  `AssetLibrary` Lua table with `AtlasOK`/`ApplyAsset` helpers that guard
+  every atlas lookup so a renamed client atlas degrades to fallback art.
+  Documentation only; not shipped in the package (the packager ignores
+  `docs`).
 
 ### Changed
 
@@ -166,17 +177,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen). The library release closes its Forever verification items:
   dual-wield off-hand anchoring and the death reset verified on the Forever
   beta, plus a Classic Era regression pass.
-
-### Added
-
-- `docs/ASSET_LIBRARY.md`: a curated catalog of client-side assets the addon
-  can draw on — bar fills, chrome, tick/spark/glow art, client fonts,
-  settings-panel bits — each tagged by verification status (in use /
-  Forever-verified via the `ref/` addons / research), plus a paste-ready
-  `AssetLibrary` Lua table with `AtlasOK`/`ApplyAsset` helpers that guard
-  every atlas lookup so a renamed client atlas degrades to fallback art.
-  Documentation only; not shipped in the package (the packager ignores
-  `docs`).
 
 ## [1.0.0-beta3] - 2026-10-01
 
