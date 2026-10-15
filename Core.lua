@@ -28,32 +28,43 @@ Addon.version = GetAddOnMetadata and GetAddOnMetadata(ADDON_NAME, "Version") or 
 -- Saved variables
 -- ---------------------------------------------------------------------------
 
+-- Schema 3: the frame's settings and position are per hand. Positions are
+-- db.positions[<Edit Mode layout>][hand] (UIParent top-center units, stored
+-- by EditMode.lua); settings are db.hands[hand] (see DEFAULTS). Schema 2 had
+-- one position per layout for the whole stack, schema 1 a single
+-- point/relativeTo/relativePoint/x/y anchor; both are migrated at load.
+local SCHEMA_VERSION = 3
+
+-- One hand's settings: all of the frame's own look, size and visibility.
+local function HandDefaults(hand)
+	local defaults = {
+		visibility = "combat", -- "always" | "combat" | "swinging" | "hidden"
+		scale = 1.0,
+		opacity = 1.0,
+		width = 260,
+		height = 18,
+		rangeFeedback = true,  -- too far / too close tint on this hand's bar
+	}
+	-- The queued next-melee highlight is the main hand's alone.
+	if hand == "mainhand" then
+		defaults.highlightQueued = true
+	end
+	return defaults
+end
+
 local DEFAULTS = {
-	point = "BOTTOM",
-	relativeTo = "UIParent",
-	relativePoint = "BOTTOM",
-	x = 0,
-	y = 220,
-	locked = false,
-	scale = 1.0,
-	width = 260,
-	height = 18,
-	gap = 4,
-	visibility = "combat", -- "swinging" | "combat" | "always"
-	skin = "native",       -- "native" | "flat"
-	fill = "drain",        -- "drain" | "fill"
-	flatPalette = "silver", -- key into Bars.FLAT_PALETTES (flat style)
+	hands = {
+		mainhand = HandDefaults("mainhand"),
+		offhand = HandDefaults("offhand"),
+		ranged = HandDefaults("ranged"),
+	},
+	skin = "native",         -- "native" | "flat": one look for all bars (Settings)
+	flatPalette = "silver",  -- key into Bars.FLAT_PALETTES (flat style)
+	fill = "drain",          -- "drain" | "fill"
 	showTime = true,
 	showSpeed = false,
 	showLabel = true,
 	showDelta = false,
-	highlightQueued = true,
-	rangeFeedback = false,
-	enabled = {
-		mainhand = true,
-		offhand = true,
-		ranged = true,
-	},
 	notifiedNativeTimer = false,
 }
 
@@ -71,6 +82,54 @@ function Addon.ApplyDefaults(db, defaults)
 end
 
 Addon.DEFAULTS = DEFAULTS
+Addon.SCHEMA_VERSION = SCHEMA_VERSION
+
+-- Saved values are trusted by the dropdowns and sliders, so anything out of
+-- range (a hand-edited file, a removed option) is put back before use: a
+-- string outside its list, a number outside its slider, a non-boolean flag.
+local CHOICES = {
+	visibility = { always = true, combat = true, swinging = true, hidden = true },
+	skin = { native = true, flat = true },
+	fill = { drain = true, fill = true },
+}
+local RANGES = {
+	scale = { 0.5, 2.0 }, opacity = { 0.1, 1.0 },
+	width = { 120, 400 }, height = { 14, 40 },
+}
+
+local function Sanitize(value, key, default)
+	if CHOICES[key] then
+		if CHOICES[key][value] then
+			return value
+		end
+		return default
+	elseif RANGES[key] then
+		if type(value) ~= "number" then
+			return default
+		end
+		return math.min(math.max(value, RANGES[key][1]), RANGES[key][2])
+	elseif type(default) == "boolean" then
+		if type(value) == "boolean" then
+			return value
+		end
+		return default
+	end
+	return value
+end
+
+function Addon.SanitizeDB(db)
+	for key, default in pairs(DEFAULTS) do
+		if type(default) ~= "table" then
+			db[key] = Sanitize(db[key], key, default)
+		end
+	end
+	for hand, defaults in pairs(DEFAULTS.hands) do
+		local cfg = db.hands[hand]
+		for key, default in pairs(defaults) do
+			cfg[key] = Sanitize(cfg[key], key, default)
+		end
+	end
+end
 
 -- ---------------------------------------------------------------------------
 -- Event dispatch
@@ -99,17 +158,57 @@ frame:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
 		if arg1 == ADDON_NAME then
 			ForeverSwingTimerDB = ForeverSwingTimerDB or {}
-			Addon.ApplyDefaults(ForeverSwingTimerDB, DEFAULTS)
-			-- The height slider's floor is 14 (the statusbar is inset 4px top
-			-- and bottom, so smaller heights collapse the fill); migrate any
-			-- value saved under the old 8px floor.
-			if ForeverSwingTimerDB.height < 14 then
-				ForeverSwingTimerDB.height = 14
+			-- Schema 3: every setting of the frame itself is per hand, like the
+			-- native bars (db.hands[hand]). Older DBs carried them once, at the top
+			-- level, with a global visibility mode and per-hand on/off toggles; a
+			-- disabled hand becomes "hidden". (gap stays for EditMode.lua's position
+			-- migration, which reads and clears it.)
+			local saved = ForeverSwingTimerDB
+			if saved.hands == nil then
+				saved.hands = {}
+				for _, hand in ipairs(Addon.HAND_ORDER) do
+					local visibility = saved.handVisibility and saved.handVisibility[hand]
+					if visibility == nil then
+						visibility = (saved.enabled and saved.enabled[hand] == false) and "hidden" or saved.visibility
+					end
+					saved.hands[hand] = {
+						visibility = visibility, scale = saved.scale, opacity = saved.opacity,
+						width = saved.width, height = saved.height,
+					}
+				end
 			end
-			-- Migrate palette keys saved by earlier builds (preset/custom
-			-- pickers) to the curated palette set.
-			if not (Addon.FLAT_PALETTES and Addon.FLAT_PALETTES[ForeverSwingTimerDB.flatPalette]) then
-				ForeverSwingTimerDB.flatPalette = Addon.FLAT_PALETTE_DEFAULT
+			saved.handVisibility, saved.visibility, saved.enabled = nil, nil, nil
+			saved.scale, saved.opacity, saved.width, saved.height = nil, nil, nil, nil
+			-- Bar style, flat colors and direction are global again (Settings): a
+			-- build that had them per hand hands its main hand's choice over.
+			local first = saved.hands.mainhand or {}
+			for _, key in ipairs({ "skin", "flatPalette", "fill" }) do
+				if saved[key] == nil then
+					saved[key] = first[key]
+				end
+				for _, hand in ipairs(Addon.HAND_ORDER) do
+					if saved.hands[hand] then
+						saved.hands[hand][key] = nil
+					end
+				end
+			end
+			-- Feedback is per hand now (Edit Mode panel): the old global queued
+			-- highlight goes to the main hand, the old range feedback to every hand.
+			if saved.highlightQueued ~= nil then
+				saved.hands.mainhand.highlightQueued = saved.highlightQueued
+			end
+			if saved.rangeFeedback ~= nil then
+				for _, hand in ipairs(Addon.HAND_ORDER) do
+					saved.hands[hand].rangeFeedback = saved.rangeFeedback
+				end
+			end
+			saved.highlightQueued, saved.rangeFeedback = nil, nil
+			Addon.ApplyDefaults(ForeverSwingTimerDB, DEFAULTS)
+			Addon.SanitizeDB(saved)
+			-- Migrate palette keys saved by earlier builds (preset/custom pickers)
+			-- to the curated palette set.
+			if not (Addon.FLAT_PALETTES and Addon.FLAT_PALETTES[saved.flatPalette]) then
+				saved.flatPalette = Addon.FLAT_PALETTE_DEFAULT
 			end
 			Addon.db = ForeverSwingTimerDB
 			-- The trace's recording flag persists in SavedVariables; reset it
@@ -165,6 +264,25 @@ function Addon:OnEnable()
 	self.libMinor = minor
 	self:CheckNativeTimer()
 	self.Bars:Enable(lib)
+end
+
+-- Every setting back to its default (positions are EditMode.lua's; the
+-- one-time native-timer notice stays acknowledged).
+function Addon:ResetSettings()
+	local db = Addon.db
+	local notified = db.notifiedNativeTimer
+	for key in pairs(DEFAULTS) do
+		db[key] = nil
+	end
+	Addon.ApplyDefaults(db, DEFAULTS)
+	db.notifiedNativeTimer = notified
+	if Addon.Bars and Addon.Bars.bars then
+		Addon.Bars:ApplyAll()
+		Addon.Bars:UpdateRangeFeedback()
+	end
+	if Addon.EditModeDialog then
+		Addon.EditModeDialog:Refresh()
+	end
 end
 
 function Addon:Print(message)
@@ -402,14 +520,8 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 	local command, arg = strtrim(msg or ""):lower():match("^(%S+)%s*(.-)$")
 	if command == "" or command == "config" or command == "options" then
 		Addon.Options:Open()
-	elseif command == "lock" then
-		Addon.db.locked = true
-		Addon.Bars:SetLocked(true)
-		Addon:Print("Bars locked.")
-	elseif command == "unlock" then
-		Addon.db.locked = false
-		Addon.Bars:SetLocked(false)
-		Addon:Print("Bars unlocked - drag them to move. Lock with |cffdddddd/4everswingtimer lock|r or in settings.")
+	elseif command == "lock" or command == "unlock" then
+		Addon:Print("Bars are placed in Edit Mode now: open Edit Mode (Esc) and drag them there.")
 	elseif command == "test" then
 		if arg == "" then
 			Addon.Bars:Test()
@@ -433,16 +545,16 @@ SlashCmdList["4EVERSWINGTIMER"] = function(msg)
 	elseif command == "proberange" then
 		Addon:ToggleRangeProbe()
 	elseif command == "reset" then
-		local defaults = Addon.DEFAULTS
-		Addon.db.point = defaults.point
-		Addon.db.relativeTo = defaults.relativeTo
-		Addon.db.relativePoint = defaults.relativePoint
-		Addon.db.x = defaults.x
-		Addon.db.y = defaults.y
-		Addon.Bars:RestorePosition()
-		Addon:Print("Position reset.")
+		if arg == "settings" or arg == "all" then
+			Addon:ResetSettings()
+			Addon:Print("Settings reset.")
+		end
+		if arg ~= "settings" then
+			Addon.EditMode:ResetPosition()
+			Addon:Print("Position reset.")
+		end
 	elseif command == "help" then
-		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), unlock, lock, test [interrupt|haste|delay|queued|effects], debug, trace, proberange, reset, help")
+		Addon:Print("Commands: |cffdddddd/4everswingtimer|r (settings), test [interrupt|haste|delay|queued|effects], debug, trace, proberange, reset [settings|all], help. Bars are placed in Edit Mode (Esc): click them there for the panel.")
 	else
 		Addon:Print("Unknown command: " .. command .. ". Try |cffdddddd/4everswingtimer help|r")
 	end

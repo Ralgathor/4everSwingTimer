@@ -45,7 +45,8 @@ verification surface; see the status note.)
 - Bars only for hands that actually swing: no off-hand bar without dual wield, no
   ranged bar without a ranged weapon, nothing outside combat when idle.
 - Clear visual language for the library's extra states: clipped and paused swings.
-- Draggable, scalable, lockable; text options (remaining time, speed, hand label).
+- Placed and scaled in Edit Mode (Blizzard's own selection art and panel);
+  text options (remaining time, speed, hand label).
 - Configuration via a standard Interface Options panel and a slash command.
 - Zero Lua errors across the library's Forever caveats (secret values, death
   reset, movement-cancelled Auto Shot).
@@ -97,7 +98,7 @@ guaranteed present on the target client.
 
 ### 4.1 Bars
 
-Three bar types, one frame each, stacked under a single anchor:
+Three bar types, one frame each, each placed and configured on its own (as the native swing timers are separate frames):
 
 | Bar | Shown when | Data source |
 |---|---|---|
@@ -139,13 +140,18 @@ Bar behavior:
 
 ### 4.2 Visibility model
 
-Mirrors the native bar's EditMode visibility modes (section 10.1) — standard
+Set per hand (main hand, off hand, ranged), as the native bars do in Edit Mode,
+with the same modes (section 10.1) plus a pre-research one — standard
 semantics and naming users already know from the client:
 
 - **In combat** (default): bars follow `UnitAffectingCombat("player")`; empty bars
   stay parked and visible between swings within a fight, hidden outside combat.
 - **While swinging**: bars appear on START, hide on STOP (the pre-research model).
 - **Always**: bars visible whenever the hand has state (weapon equipped), even empty.
+- **Hidden**: the hand has no bar (replaces the old per-hand on/off toggle).
+
+Saved as `db.hands[hand].visibility`; the old global `visibility` plus
+`enabled[hand]` migrate at load (disabled hand → Hidden, others take the old mode).
 
 ### 4.3 Delta indicator (optional, minimal)
 
@@ -155,20 +161,38 @@ wielders are the only audience; keep it one font string, no alignment tooling.
 
 ### 4.4 Configuration
 
-- Hand-rolled Interface Options panel plus a slash command `/4everswingtimer`
-  (slash command names may start with a digit; verify in client) with a
-  `/everswing` alias. Note: `/wst`, `/st` and `/fst` are all taken by existing
-  swing timer addons — do not reuse them (section 10.2).
-- Settings: enable per-hand bars, anchor position (drag while unlocked), scale, bar
-  width/height, fill direction, texture (small shipped set; the game's shared
-  media where available), text toggles, show/hide rules, lock toggle.
+Configuration follows Blizzard's own patterns, as 4everActionTimeline does
+(its ADR-0008): Edit Mode holds the frame, Options holds the rest.
+
+- **Edit Mode** (`EditMode.lua`): the bars are not a registered Edit Mode
+  system and never write into Blizzard's layout tables — every code path
+  into the Edit Mode manager taints the raid frames' updates on this client
+  (timeline probes E3/E6, in game on the same build). While Edit Mode is
+  open each bar wears Blizzard's own selection art (blue idle, yellow
+  selected, a label), drags and snaps to nearby Edit Mode frames, the other bars and the grid
+  (Blizzard's red preview lines, drawn by us), and a click opens the
+  settings panel for that hand. Each position is stored per hand and Edit Mode layout
+  (`db.positions["<layoutType>:<layoutName>"][hand]`, UIParent top-center units, with
+  a `default` entry for migrated forms; schema 3 — the older stack forms migrate at
+  init). Outside Edit Mode the bars are click-through.
+- **The Edit Mode panel** (`EditModeDialog.lua`): the selected hand's own settings (`db.hands[hand]`) —
+  position reset, scale, opacity, width, height, visibility, range feedback
+  (every hand) and the queued-attack highlight (main hand only) —
+  plus the swing and effect test
+  previews that used to sit under the unlocked bars. Built from generic
+  templates only (never `EditModeSetting*`), pcall-guarded; no Options
+  button (opening Settings needs Edit Mode stepped aside — the taint
+  path); a note points at `/4everswingtimer options`.
+- **Options** (`Options.lua`, `/4everswingtimer` with a `/everswing`
+  alias; `/wst`, `/st` and `/fst` are taken — section 10.2): per-hand bar
+  toggles, the feedback features and the text readouts, under section
+  headers.
 - Saved per-character. The saved-variable global must be a valid Lua identifier:
   declare `## SavedVariables: ForeverSwingTimerDB` — the addon name (TOC) stays
   `4everSwingTimer`, but `4everSwingTimerDB` is not a valid Lua identifier, so the
   DB global is accessed via a name that is.
-- "Test bars" button: animates a fake 2.0s swing on all three bars for layout work
-  without combat.
-- Effect previews (`test interrupt|haste|delay|queued`, overlay effect buttons):
+- Effect previews (`test interrupt|haste|delay|queued`, the Edit Mode
+  panel's buttons):
   each reproduces its real event signature on a fake swing scoped to the
   effect's hands - the interrupt restarts the swing (cast reset), the haste
   shortens the swings on all hands (parry UPDATE on melee, dynamic-haste
@@ -246,8 +270,23 @@ Forever beta:
 8. Death + in-place resurrection: bars stop cleanly, next swing starts fresh.
 9. Dungeon mid-fight (restricted content): no Lua errors; bars stay accurate
    (the library's payload is plain — §4.5 — so this should be uneventful).
-10. Options: every toggle applies live; test-bars button works; reload keeps
-    position and settings (SavedVariables).
+10. Options and placement: every toggle applies live. Edit Mode, per hand:
+    all three bars show (a Hidden hand too, parked), each wears Blizzard's
+    selection art, drags and snaps independently (also to the other bars)
+    and opens its own panel (title names the hand) whose scale, opacity,
+    width, height, visibility, range feedback (and queued highlight on the
+    main hand only) apply live, with test buttons scoped to that hand and
+    rows closing up on off-hand/ranged; Reset position resets that hand
+    only. Reload keeps positions (per hand and Edit Mode layout) and
+    settings; switching Edit Mode layouts moves each bar to that layout's
+    own position; deleting a layout drops its entry; `/4everswingtimer
+    reset` restores the default stack, `reset settings` the defaults, and
+    `reset all` both. Bar style, flat colors and direction (addon options)
+    apply to every hand. Migration: load a schema 1 and a schema 2
+    SavedVariables file - bars keep their place (visible hands first) and
+    settings, the lock/unlock fields are gone. BugSack shows no taint
+    error after entering and leaving Edit Mode, selecting bars and
+    switching layouts (raid frames still update).
 11. Library missing/disabled: addon loads inert with its chat notice, no error.
 12. Effect previews out of combat: `test interrupt` restarts the fake swing
     (red flash, bar back at the top for a fresh duration), `test haste`
@@ -271,8 +310,8 @@ Forever beta:
     "while swinging" visibility mode, no stuck tick at the fill's edge and
     no interrupt flash. A moving Auto Shot must still fire its amber delay
     burst at the re-anchor inside that window. The convergence must also
-    happen with nothing on screen - a first login out of combat with the UI
-    locked hides the anchor, and a hidden frame receives no OnUpdate, so the
+    happen with nothing on screen - a first login out of combat hides the
+    anchor, and a hidden frame receives no OnUpdate, so the
     convergence runs on a C_Timer ticker (SweepStaleLandings), not only the
     update loop: log in fresh, wait, then enter combat - the bars must
     appear already parked correctly.
@@ -281,8 +320,7 @@ Forever beta:
     right edge, not at the far left; in drain mode it sits empty with the
     tick at the left, matching a normally landed swing's parked state. The
     first swing must find the tick at the correct parked position. Verify on
-    a first-time login too (fresh client start, not just `/reload`), and
-    with the UI locked from the previous session. The parked pair is
+    a first-time login too (fresh client start, not just `/reload`). The parked pair is
     re-applied on every visibility pass, so the tick must also converge
     after equipment streaming or world entry, not only at the init pass.
 

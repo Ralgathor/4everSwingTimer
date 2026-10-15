@@ -1,74 +1,77 @@
--- 4everSwingTimer — Options: settings registration via the client's
--- Settings (vertical layout) API, plus the open-settings entry point.
+-- 4everSwingTimer — Options: the Settings category (the client's Settings
+-- vertical layout API, 12.x; Forever has no InterfaceOptions_AddCategory).
 --
--- Forever runs the mainline 12.x settings system: InterfaceOptions_AddCategory
--- no longer exists there. Proxy settings are used (getValue/setValue) so every
--- change applies live without depending on commit timing.
+-- The configuration follows Blizzard's own patterns, as 4everActionTimeline
+-- does (its ADR-0008): the frame's own settings - position, scale, opacity,
+-- width, height, visibility and the feedback features, all per hand - live in the Edit Mode panel
+-- (EditModeDialog.lua), reached by clicking a hand's bar in Edit Mode; this
+-- category holds the rest: the bar style, flat colors and direction (the same
+-- for every hand) and the text readouts, under
+-- section headers.
+--
+-- Build 70338+ has section headers
+-- (CreateSettingsListSectionHeaderInitializer) and button rows
+-- (CreateSettingsButtonInitializer), added through the layout — the
+-- category call's second return; both are nil-guarded so the category still
+-- builds without them.
+--
+-- Proxy settings are used (getValue/setValue) so every change applies live
+-- without depending on commit timing.
 --
 -- Dropdown contract on this client (verified against the shipped
 -- Blizzard_Settings.lua): CreateDropdown's `options` argument is passed to
 -- Settings.CreateDropdownOptionInserter as `optionsFunc` and is CALLED
 -- (ipairs(optionsFunc())) — it must be a function returning the entry list,
 -- never the list itself. Each entry needs controlType = Settings.ControlType.Radio.
---
--- The vertical layout supports checkbox, slider and dropdown controls only —
--- there is no button control, which is why "Test bars" lives on the unlocked
--- bar overlay and on the slash command instead of this panel.
 
 local Addon = FourEverSwingTimer
 
 local Options = {}
 Addon.Options = Options
 
-local category
+local category, layout
 local VAR_PREFIX = "4everSwingTimer."
 
 -- ---------------------------------------------------------------------------
 -- Helpers
 -- ---------------------------------------------------------------------------
 
-local function ApplyAll()
-	if Addon.Bars and Addon.Bars.bars then
-		Addon.Bars:ApplyAll()
-	end
-end
-
 local function ProxyBoolean(variable, name, defaultValue, getValue, setValue)
 	return Settings.RegisterProxySetting(category, variable, Settings.VarType.Boolean, name,
 		defaultValue, getValue, setValue)
 end
 
--- Shared proxy body: reads and writes Addon.db[variable] directly so
--- every change applies live without depending on commit timing.
-local function ProxyVariable(variable, varType, name, defaultValue, onSet)
-	return Settings.RegisterProxySetting(category, VAR_PREFIX .. variable, varType, name,
-		defaultValue,
+-- A section header; the layout's AddInitializer and the header initializer
+-- are nil-guarded (the category still builds without them).
+local function Header(text, tooltip)
+	if layout and layout.AddInitializer and CreateSettingsListSectionHeaderInitializer then
+		layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(text, tooltip))
+	end
+end
+
+-- Radio dropdown options from a list of { value, label } entries.
+local function DropdownOptions(entries)
+	local container = Settings.CreateControlTextContainer()
+	for i = 1, #entries do
+		container:Add(entries[i][1], entries[i][2], nil, Settings.ControlType.Radio)
+	end
+	return container:GetData()
+end
+
+-- A string dropdown on Addon.db[variable], applied live through onSet.
+local function StringDropdown(variable, name, entries, tooltip, onSet)
+	local setting = Settings.RegisterProxySetting(category, VAR_PREFIX .. variable, Settings.VarType.String, name,
+		Addon.db[variable],
 		function()
 			return Addon.db[variable]
 		end,
 		function(value)
 			Addon.db[variable] = value
-			if onSet then
-				onSet(value)
-			end
+			onSet()
 		end)
-end
-
--- Radio dropdown options from a list of { value, label, tooltip } entries.
-local function DropdownOptions(entries)
-	local container = Settings.CreateControlTextContainer()
-	for i = 1, #entries do
-		container:Add(entries[i].value, entries[i].label, entries[i].tooltip, Settings.ControlType.Radio)
-	end
-	return container:GetData()
-end
-
-local function ProxyString(variable, name, defaultValue, entries, onSet)
-	local setting = ProxyVariable(variable, Settings.VarType.String, name, defaultValue, onSet)
-	local function GetOptions()
+	Settings.CreateDropdown(category, setting, function()
 		return DropdownOptions(entries)
-	end
-	return setting, GetOptions
+	end, tooltip)
 end
 
 -- ---------------------------------------------------------------------------
@@ -80,83 +83,35 @@ function Options:Init()
 		return
 	end
 	local db = Addon.db
-	category = Settings.RegisterVerticalLayoutCategory(Addon.name)
+	category, layout = Settings.RegisterVerticalLayoutCategory(Addon.name)
 	Settings.RegisterAddOnCategory(category)
 
-	-- Bar visibility and look
-	local visibility, visibilityOptions = ProxyString("visibility", "Show bars", db.visibility, {
-		{ value = "swinging", label = "While swinging" },
-		{ value = "combat",   label = "In combat" },
-		{ value = "always",   label = "Always (weapon equipped)" },
-	}, function() Addon.Bars:UpdateVisibility() end)
-	Settings.CreateDropdown(category, visibility, visibilityOptions,
-		"While swinging: bars appear on each swing. In combat: bars stay parked and visible for the whole fight. Always: bars show whenever the hand has a weapon.")
+	Header("Position and size",
+		"Open Edit Mode (Esc, then Edit Mode) and click a bar: the panel beside it holds that hand's position (with a Reset position button), scale, opacity, width, height, visibility (always, in combat, while swinging or hidden), range feedback and (main hand) the queued-attack highlight - plus the swing and effect test previews.")
 
-	local skin, skinOptions = ProxyString("skin", "Bar style", db.skin, {
-		{ value = "native", label = "Native (like the game's own)" },
-		{ value = "flat",   label = "Flat" },
-	}, function() Addon.Bars:ApplySkin() end)
-	Settings.CreateDropdown(category, skin, skinOptions,
-		"Native reuses the game's swing timer art. Flat uses plain colored bars, styled by the Flat bar colors option below.")
+	Header("Style", "How the bars look, the same for every hand.")
+	StringDropdown("skin", "Bar style", {
+		{ "native", "Native (like the game's own)" },
+		{ "flat", "Flat" },
+	}, "Native reuses the game's swing timer art. Flat uses plain colored bars, styled by the Flat bar colors option below.",
+		function() Addon.Bars:ApplySkin() end)
 
 	local paletteEntries = {}
 	for i = 1, #Addon.FLAT_PALETTE_ORDER do
 		local key = Addon.FLAT_PALETTE_ORDER[i]
-		paletteEntries[#paletteEntries + 1] = { value = key, label = Addon.FLAT_PALETTES[key].label }
+		paletteEntries[#paletteEntries + 1] = { key, Addon.FLAT_PALETTES[key].label }
 	end
-	local palette, paletteOptions = ProxyString("flatPalette", "Flat bar colors", db.flatPalette, paletteEntries, ApplyAll)
-	Settings.CreateDropdown(category, palette, paletteOptions,
-		"Only applies to the Flat bar style (native uses the game's own art). Every palette stays clear of the effect colors (queued yellow, interrupt red, delay amber, haste teal) so the effects always read.")
+	StringDropdown("flatPalette", "Flat bar colors", paletteEntries,
+		"Only applies to the Flat bar style (native uses the game's own art). Every palette stays clear of the effect colors (queued yellow, interrupt red, delay amber, haste teal) so the effects always read.",
+		function() Addon.Bars:ApplyAll() end)
 
-	local fill, fillOptions = ProxyString("fill", "Bar direction", db.fill, {
-		{ value = "drain", label = "Drain (full to empty)" },
-		{ value = "fill",  label = "Fill (empty to full)" },
-	}, ApplyAll)
-	Settings.CreateDropdown(category, fill, fillOptions,
-		"Drain matches classic swing timer addons; Fill matches the game's own bar.")
+	StringDropdown("fill", "Bar direction", {
+		{ "drain", "Drain (full to empty)" },
+		{ "fill", "Fill (empty to full)" },
+	}, "Drain matches classic swing timer addons; Fill matches the game's own bar.",
+		function() Addon.Bars:ApplyAll() end)
 
-	Settings.CreateCheckbox(category,
-		ProxyBoolean(VAR_PREFIX .. "highlightQueued", "Highlight queued attacks", db.highlightQueued,
-			function() return db.highlightQueued end,
-			function(value)
-				db.highlightQueued = value
-				Addon.Bars:SetHighlightQueued(value)
-			end),
-		"While a next-melee ability (Heroic Strike, Cleave, Raptor Strike, Maul) is queued, the main-hand bar's fill takes the cast bar's yellow and the tick lights up with a glow. Works in both bar styles.")
-
-	Settings.CreateCheckbox(category,
-		ProxyBoolean(VAR_PREFIX .. "rangeFeedback", "Range feedback", db.rangeFeedback,
-			function() return db.rangeFeedback end,
-			function(value)
-				db.rangeFeedback = value
-				Addon.Bars:SetRangeFeedback(value)
-			end),
-		"Too far from your target, or inside the ranged dead zone (too close to fire): the bar's fill turns amber, a white state word appears after the hand name, and entering the state plays a one-shot shake - the interrupt treatment's own animation. Read from your target's distance; the beta client's range event is nonfunctional.")
-
-	Settings.CreateCheckbox(category,
-		ProxyBoolean(VAR_PREFIX .. "locked", "Locked", db.locked,
-			function() return db.locked end,
-			function(value)
-				db.locked = value
-				Addon.Bars:SetLocked(value)
-			end),
-		"Uncheck to drag the bars around. The unlock overlay has a Test bars button.")
-
-	-- Layout
-	local width = ProxyVariable("width", Settings.VarType.Number, "Width", db.width, ApplyAll)
-	Settings.CreateSlider(category, width, Settings.CreateSliderOptions(120, 400, 10), "Bar width in pixels.")
-
-	local height = ProxyVariable("height", Settings.VarType.Number, "Height", db.height, ApplyAll)
-	Settings.CreateSlider(category, height, Settings.CreateSliderOptions(14, 40, 1),
-		"Bar height in pixels. The minimum is 14: the fill is inset 4px top and bottom, and the text needs the remaining room.")
-
-	local gap = ProxyVariable("gap", Settings.VarType.Number, "Spacing", db.gap, ApplyAll)
-	Settings.CreateSlider(category, gap, Settings.CreateSliderOptions(0, 16, 1), "Space between bars in pixels.")
-
-	local scale = ProxyVariable("scale", Settings.VarType.Number, "Scale", db.scale, ApplyAll)
-	Settings.CreateSlider(category, scale, Settings.CreateSliderOptions(0.5, 2.0, 0.05), "Overall bar scale.")
-
-	-- Text
+	Header("Text", "The readouts on each bar.")
 	Settings.CreateCheckbox(category,
 		ProxyBoolean(VAR_PREFIX .. "showTime", "Show remaining time", db.showTime,
 			function() return db.showTime end,
@@ -192,28 +147,22 @@ function Options:Init()
 				Addon.Bars:ApplyText()
 			end),
 		"Off-hand bar only: the swing delta between hands, useful for dual wielders.")
-
-	-- Hands
-	for i = 1, #Addon.HAND_ORDER do
-		local hand = Addon.HAND_ORDER[i]
-		Settings.CreateCheckbox(category,
-			ProxyBoolean(VAR_PREFIX .. "enabled." .. hand, Addon.HAND_SETTING_NAME[hand], db.enabled[hand],
-				function() return db.enabled[hand] end,
-				function(value)
-					db.enabled[hand] = value
-					Addon.Bars:UpdateVisibility()
-				end),
-			Addon.HAND_SETTING_TOOLTIP[hand])
-	end
 end
 
 function Options:Open()
 	if not category then
 		return
 	end
-	-- OpenToCategory's argument has shifted between client builds; try the
-	-- category object first and its numeric id as a fallback.
-	if not pcall(Settings.OpenToCategory, category) then
-		pcall(Settings.OpenToCategory, category.GetID and category:GetID() or nil)
+	-- OpenToCategory takes the category's numeric id on this client (it
+	-- hands it to C_SettingsUtil.OpenSettingsPanel). Passing the category
+	-- object first failed there on 4everActionTimeline after opening the
+	-- panel on Blizzard's own pages under addon taint, so their Social page
+	-- called a protected function. The id goes first; the object only on a
+	-- build without one.
+	local id = category.GetID and category:GetID() or category.ID
+	if id then
+		pcall(Settings.OpenToCategory, id)
+	else
+		pcall(Settings.OpenToCategory, category)
 	end
 end

@@ -1,7 +1,7 @@
 # 4everSwingTimer
 
-Swing timer bars for **WoW: Forever** — main-hand, off-hand and ranged, in one
-moveable stack.
+Swing timer bars for **WoW: Forever** — main-hand, off-hand and ranged,
+each its own moveable bar.
 
 Unlike skins of the game's built-in swing timer, 4everSwingTimer is driven by
 [LibClassicSwingTimerAPI](https://github.com/Ralgathor/LibClassicSwingTimerAPI),
@@ -40,11 +40,16 @@ read).
 | Command | Action |
 |---|---|
 | `/4everswingtimer` (alias `/everswing`) | open settings, or run a subcommand |
-| `... unlock` / `... lock` | show the drag overlay / lock the bars |
 | `/4everswingtimer test` | animate a fake 2.0s swing on all enabled bars |
 | `... test interrupt` / `haste` / `delay` / `queued` | trigger any effect on demand (replayed on a fake swing when none is running) |
 | `... test effects` | play all effects in sequence |
-| `... reset` | reset the bar position |
+| `... reset` | reset every bar position for the current Edit Mode layout |
+| `... reset settings` / `... reset all` | reset every setting to its default / settings and positions |
+
+Each bar is placed in **Edit Mode**: open Edit Mode (Esc), drag a bar (it
+snaps to the game's own frames, the other bars and the grid), and click it for its panel —
+scale, opacity, width, height, visibility and range feedback (all per hand, plus the queued-attack highlight on the main hand); bar style, colors and direction are in the addon options,
+plus the test previews. The position is remembered per Edit Mode layout.
 
 Settings are per-character and also available under Game Settings > Addons.
 

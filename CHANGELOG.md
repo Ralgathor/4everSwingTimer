@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- EditMode.lua (placement: EventRegistry callbacks, Blizzard selection
+  art via NineSliceUtil with a plain-band fallback, drag, snap and preview
+  lines, per-layout positions, reset) and EditModeDialog.lua (the panel).
+- Each hand's bar is its own frame, as the native swing timers are: it has its
+  own Edit Mode selection, drag/snap (also to the other bars), position per
+  Edit Mode layout, and its own panel with scale, opacity, width, height,
+  visibility, range feedback and (main hand) the queued-attack highlight.
+  Bar style, flat bar colors and direction stay global, in the
+  addon options (Style section), not in Edit Mode. The saved variables
+  move to schema 3 (db.hands[hand], db.positions[layout][hand]); the older
+  global settings and single-stack positions migrate at load. In Edit Mode
+  every bar shows, even a Hidden one.
+- Per-hand visibility (Edit Mode panel): each bar is Always, In combat, While
+  swinging or Hidden, like the native bars; the old global mode and per-hand
+  toggles migrate at load.
+- `/4everswingtimer reset settings` (every setting back to its default) and
+  `reset all` (settings and positions); saved values are validated at load
+  (out-of-range numbers clamped, unknown choices reset); positions of deleted
+  Edit Mode layouts are dropped; the panel's test previews act on the
+  selected hand.
+- Range feedback is on by default (per hand).
+- Opacity setting (Edit Mode panel); while Edit Mode is open the bars show,
+  parked, and range feedback is suppressed, as on Blizzard's own bars.
+
+### Changed
+
+- Configuration moved to Blizzard's own patterns, after 4everActionTimeline's
+  ADR-0008 (same client, its M10 probes): the bars are placed in **Edit
+  Mode** and everything about the frame itself lives in a click-opened
+  panel beside them.
+- The bars are no longer a registered drag target with a Locked setting:
+  outside Edit Mode they are click-through, and while Edit Mode is open they
+  wear Blizzard's own selection art (blue idle, yellow selected, a label),
+  drag, and snap to nearby Edit Mode frames and the grid, drawing Blizzard's
+  red snap preview lines. Clicking them opens their settings panel. The
+  bars are **not** a registered Edit Mode system and nothing writes into
+  Blizzard's layout tables: every code path into the Edit Mode manager
+  taints the raid frames' updates on this client (timeline probes E3/E6, in
+  game), so the addon only listens for the EventRegistry's Edit Mode
+  enter/exit and reads Blizzard's frames.
+- The frame's own settings - scale, opacity (new), width, height and
+  visibility - moved from
+  the Settings category into the Edit Mode panel, together with a Reset
+  position button and the swing/effect test previews that used to sit under
+  the unlocked bars (EditModeDialog.lua, built from generic templates
+  only, pcall-guarded; no Options button - stepping Edit Mode aside is the
+  taint path - a note points at /4everswingtimer options).
+- The position is now stored **per Edit Mode layout** (db.positions,
+  UIParent top-center units so a bar's own scale never moves it, with a
+  default entry; saved-variable schema 2 - the old single point/x/y
+  anchor migrates at load). Switching Edit Mode layouts moves the bars to
+  that layout's own position; /4everswingtimer reset puts the active
+  layout back at the built-in default spot.
+- The Settings category (Options.lua) keeps the per-hand bar toggles, the
+  feedback features (queued highlight, range feedback) and the text
+  readouts, under section headers (build 70338+
+  CreateSettingsListSectionHeaderInitializer through the layout's second
+  return, nil-guarded). Settings.OpenToCategory now passes the numeric
+  category id first - the category-object path failed on 4everActionTimeline
+  with addon taint on Blizzard's own Settings pages.
+
+### Removed
+
+- The Spacing setting and the single stacked layout (each bar is placed
+  alone; the default places still stack them).
+- The global "Show bars" mode and the per-hand toggles in Settings (replaced
+  by per-hand visibility); - The Locked setting, the unlock overlay and its test buttons (now in the
+  Edit Mode panel); the `lock` / `unlock` commands now only point at Edit
+  Mode.
+
 ## [1.0.0-beta5] - 2026-10-14
 
 ### Added

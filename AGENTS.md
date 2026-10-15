@@ -24,7 +24,17 @@ Design spec, Forever API constraints, verification checklist and roadmap:
 - `Core.lua` — bootstrap, saved variables (`ForeverSwingTimerDB`), library
   gate, event dispatch, slash commands.
 - `Bars.lua` — bar frames, library callback wiring, visual states, test mode.
-- `Options.lua` — settings via the 12.x Settings (vertical layout) API.
+- `EditMode.lua` — placement in Edit Mode: EventRegistry callbacks,
+  Blizzard's selection art, drag, snap and preview lines, one position per hand and
+  Edit Mode layout (schema 3). Never calls into the Edit Mode manager —
+  every code path there taints the raid frames' updates on this client.
+- `EditModeDialog.lua` — the panel that opens when a hand's bar is clicked
+  in Edit Mode: that hand's own settings (scale, opacity, size, visibility,
+  range feedback; the queued highlight on the main hand)
+  and the test previews, built from generic templates only.
+- `Options.lua` — the Settings category: the bar style, flat colors and direction and the
+  text readouts, under section headers, via the
+  12.x Settings (vertical layout) API.
 - `4everSwingTimer.toc` — manifest. The addon name starts with a digit on
   purpose; the saved-variable global is `ForeverSwingTimerDB` (valid Lua
   identifier requirement).
@@ -59,8 +69,20 @@ Do not commit `Libs/` or `.release/` — generated and gitignored.
 - `InterfaceOptions_AddCategory` does not exist on this client. Use
   `Settings.RegisterVerticalLayoutCategory` + `Settings.RegisterAddOnCategory`
   with proxy settings (`Settings.RegisterProxySetting`).
-- The vertical layout has **no button control** — buttons go on the bar overlay
-  or slash commands, not the settings panel.
+- Build 70338+ has section headers
+  (`CreateSettingsListSectionHeaderInitializer`) and button rows
+  (`CreateSettingsButtonInitializer`), added through the layout — the
+  category call's second return; both are nil-guarded in Options.lua.
+- `Settings.OpenToCategory` takes the category's numeric id on this client;
+  the category-object path failed on 4everActionTimeline under addon taint.
+- Configuration follows 4everActionTimeline's ADR-0008: the frame's own
+  settings (position, scale, opacity, size, visibility, feedback; all per
+  hand, each bar being its own frame) live in the
+  Edit Mode panel; Options holds the rest; nothing dynamic registers there.
+  Never call Blizzard's Edit Mode manager from addon code (opening Edit Mode,
+  clearing its selection, stepping it aside) — it taints the raid frames'
+  updates (timeline probes E3/E6, in game). The bars are not a registered
+  Edit Mode system and write nothing into Blizzard's layout tables.
 - `Settings.VarType` on this client has no Color — no color pickers; the flat
   style uses curated palettes (see FLAT_PALETTES in Bars.lua) chosen for
   distance from the effect colors. If a settings value must match a validator

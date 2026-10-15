@@ -211,8 +211,8 @@ local STATUS_INSET_Y = 4
 local TICK_STATUSBAR_RATIO = 1.1
 
 -- Shared tick height across all tick variants.
-local function TickHeight()
-	return math.max((Addon.db.height - STATUS_INSET_Y * 2) * TICK_STATUSBAR_RATIO, 8)
+local function TickHeight(hand)
+	return math.max((Addon.db.hands[hand].height - STATUS_INSET_Y * 2) * TICK_STATUSBAR_RATIO, 8)
 end
 
 -- The glow uses the cast bar's own proportions, scaled to the fill: 12px on
@@ -221,8 +221,8 @@ end
 local CASTBAR_GLOW_WIDTH_RATIO = 37 / 13
 local CASTBAR_GLOW_HEIGHT_RATIO = 12 / 13
 
-local function GlowSize()
-	local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
+local function GlowSize(hand)
+	local fillHeight = Addon.db.hands[hand].height - STATUS_INSET_Y * 2
 	return math.max(fillHeight * CASTBAR_GLOW_WIDTH_RATIO, 8),
 		math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4)
 end
@@ -233,7 +233,7 @@ end
 local function ApplyPipSize(bar, atlas)
 	bar.pip:SetAtlas(atlas or PIP_ATLAS, true)
 	local nativeW, nativeH = bar.pip:GetSize()
-	local tickHeight = TickHeight()
+	local tickHeight = TickHeight(bar.hand)
 	if nativeH and nativeH > 0 then
 		bar.pip:SetSize(tickHeight * (nativeW / nativeH), tickHeight)
 	end
@@ -252,7 +252,7 @@ local function FireStreak(bar, streak, shot, group, reverse)
 		return
 	end
 	local statusWidth = bar.status:GetWidth()
-	local fillHeight = Addon.db.height - STATUS_INSET_Y * 2
+	local fillHeight = Addon.db.hands[bar.hand].height - STATUS_INSET_Y * 2
 	local edge = bar.status:GetValue() * statusWidth
 	local streakWidth = math.min(math.max(statusWidth * 0.3, 40), statusWidth)
 	streak:SetSize(streakWidth, math.max(fillHeight * CASTBAR_GLOW_HEIGHT_RATIO, 4))
@@ -317,89 +317,20 @@ local QUEUE_POLL = 0.20
 local Bars = {}
 Addon.Bars = Bars
 
--- Exported for Options.lua (hand toggles in the settings panel).
 Addon.HAND_ORDER = HAND_ORDER
-Addon.HAND_SETTING_NAME = {
-	mainhand = "Main-hand bar",
-	offhand = "Off-hand bar",
-	ranged = "Ranged bar",
-}
-Addon.HAND_SETTING_TOOLTIP = {
-	mainhand = "Show the main-hand swing bar.",
-	offhand = "Show the off-hand swing bar (dual wield only).",
-	ranged = "Show the ranged swing bar (Auto Shot, wand).",
-}
+-- Exported for the Edit Mode handles and panel title (the client's own names).
+Addon.HAND_LABEL = HAND_LABEL
 
 -- ---------------------------------------------------------------------------
 -- Frames
 -- ---------------------------------------------------------------------------
 
-local anchor = CreateFrame("Frame", "FourEverSwingTimerAnchor", UIParent)
-Bars.anchor = anchor
-anchor:SetFrameStrata("LOW")
-anchor:SetClampedToScreen(true)
-anchor:SetMovable(true)
-anchor:Hide()
-
-anchor:SetScript("OnDragStart", function(self)
-	self:StartMoving()
-end)
-
-anchor:SetScript("OnDragStop", function(self)
-	self:StopMovingOrSizing()
-	local db = Addon.db
-	local point, relativeTo, relativePoint, x, y = self:GetPoint()
-	db.point = point
-	db.relativeTo = (relativeTo and relativeTo.GetName and relativeTo:GetName()) or "UIParent"
-	db.relativePoint = relativePoint
-	db.x = x
-	db.y = y
-end)
-
--- Unlock overlay: drag hint, test button. Only shown while unlocked.
-local overlay = CreateFrame("Frame", nil, anchor)
-Bars.overlay = overlay
-overlay:SetAllPoints(anchor)
-overlay:EnableMouse(false)
-
-overlay.bg = overlay:CreateTexture(nil, "BACKGROUND")
-overlay.bg:SetAllPoints(overlay)
-overlay.bg:SetColorTexture(0.05, 0.05, 0.05, 0.35)
-
-overlay.label = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-overlay.label:SetPoint("BOTTOM", overlay, "TOP", 0, 2)
-overlay.label:SetText("4everSwingTimer - drag to move")
-
--- Test buttons under the bars (shown while unlocked): the swing animation
--- and each effect treatment, all through the same handlers as the
--- /4everswingtimer test commands.
-local function CreateOverlayButton(overlay, text, onClick)
-	local button = CreateFrame("Button", nil, overlay, "UIPanelButtonTemplate")
-	button:SetSize(74, 20)
-	button:SetText(text)
-	button:SetScript("OnClick", onClick)
-	return button
-end
-
-overlay.testButton = CreateOverlayButton(overlay, "Swing", function()
-	Bars:Test()
-end)
-overlay.testButton:SetPoint("TOPLEFT", overlay, "BOTTOMLEFT", 0, -2)
-local previous = overlay.testButton
-local effectButtons = {
-	{ label = "Interrupt", effect = "interrupt" },
-	{ label = "Haste", effect = "haste" },
-	{ label = "Delay", effect = "delay" },
-	{ label = "Queued", effect = "queued" },
-}
-for i = 1, #effectButtons do
-	local def = effectButtons[i]
-	local button = CreateOverlayButton(overlay, def.label, function()
-		Bars:TestEffect(def.effect)
-	end)
-	button:SetPoint("LEFT", previous, "RIGHT", 4, 0)
-	previous = button
-end
+-- Each hand's bar is its own top-level frame, as in the native UI: placement
+-- (drag, snap, per-Edit-Mode-layout positions, the click-opened settings
+-- panel) lives in EditMode.lua, which makes the bars movable and clamped.
+-- Outside Edit Mode the bars are click-through. The update loop runs off a
+-- driver frame that is always shown.
+local driver = CreateFrame("Frame")
 
 -- Interrupted-cast shake: alternating horizontal translation keyframes with
 -- decaying amplitude (~0.7 s). Blizzard's exact InterruptShakeAnim was tested
@@ -516,7 +447,10 @@ local function CreateStreak(bar, mirrored)
 end
 
 local function CreateBar(hand)
-	local bar = CreateFrame("Frame", "FourEverSwingTimerBar" .. hand, anchor)
+	local bar = CreateFrame("Frame", "FourEverSwingTimerBar" .. hand, UIParent)
+	bar:SetFrameStrata("LOW")
+	bar:SetClampedToScreen(true)
+	bar:SetMovable(true)
 	bar.hand = hand
 
 	bar.bg = bar:CreateTexture(nil, "BACKGROUND")
@@ -736,7 +670,7 @@ end
 -- vertex color.
 function Bars:ApplyFillStyle(bar)
 	local db = Addon.db
-	local queued = db.highlightQueued and bar.queued
+	local queued = db.hands[bar.hand].highlightQueued and bar.queued
 	if db.skin == "native" then
 		bar.status:SetStatusBarTexture(FILL_ATLAS[bar.hand])
 	else
@@ -761,7 +695,7 @@ function Bars:ApplyFillStyle(bar)
 	-- the normal pip - the red interrupted pip stays transient-only, part
 	-- of the real interrupt treatment.
 	ApplyPipSize(bar)
-	local glowW, glowH = GlowSize()
+	local glowW, glowH = GlowSize(bar.hand)
 	bar.queuedGlow:SetSize(glowW, glowH)
 	if queued then
 		-- The tick joins the queued color language.
@@ -787,7 +721,7 @@ end
 -- different colors.
 function Bars:GetBaseFillColor(bar)
 	local db = Addon.db
-	if db.highlightQueued and bar.queued then
+	if db.hands[bar.hand].highlightQueued and bar.queued then
 		return QUEUED_TINT[1], QUEUED_TINT[2], QUEUED_TINT[3]
 	end
 	if bar.rangeState then
@@ -803,7 +737,7 @@ end
 -- IsCurrentSpell is a cheap client-side call (four lookups per tick).
 function Bars:UpdateQueued()
 	local db = Addon.db
-	if not db.highlightQueued or not IsCurrentSpell then
+	if not db.hands.mainhand.highlightQueued or not IsCurrentSpell then
 		return
 	end
 	local bar = self.bars and self.bars.mainhand
@@ -984,7 +918,15 @@ end
 -- neutral rather than stuck dimmed.
 function Bars:UpdateRangeFeedback()
 	local db = Addon.db
-	if not db.rangeFeedback
+	local wanted = false
+	for i = 1, #HAND_ORDER do
+		if db.hands[HAND_ORDER[i]].rangeFeedback then
+			wanted = true
+			break
+		end
+	end
+	if not wanted
+		or Addon.editMode
 		or not UnitExists("target")
 		or (UnitIsDeadOrGhost and UnitIsDeadOrGhost("target"))
 		or not (UnitCanAttack and UnitCanAttack("player", "target")) then
@@ -1054,30 +996,30 @@ function Bars:UpdateRangeFeedback()
 		elseif not meleeInRange then
 			state = "far"
 		end
+		if not db.hands[hand].rangeFeedback then
+			state = nil -- this hand has the feature off
+		end
 		self:ApplyRangeState(self.bars[hand], state)
 	end
 end
 
-function Bars:SetRangeFeedback(enabled)
+-- A hand's range feedback switched (Edit Mode panel): arming makes the native
+-- query answer, the poll picks the state up within RANGE_POLL; off, the
+-- hand's state clears at once.
+function Bars:SetRangeFeedback(hand, enabled)
 	if enabled then
-		-- Arming is what makes the native query answer; the poll picks up
-		-- the state within RANGE_POLL.
 		ArmRangeChecks()
-	elseif self.bars then
-		-- Clear the state immediately on disable.
-		for i = 1, #HAND_ORDER do
-			self:ApplyRangeState(self.bars[HAND_ORDER[i]], nil)
-		end
+	elseif self.bars and self.bars[hand] then
+		self:ApplyRangeState(self.bars[hand], nil)
 	end
 end
 
 function Bars:ApplySkin()
 	local db = Addon.db
-	local native = db.skin == "native"
 	for i = 1, #HAND_ORDER do
 		local hand = HAND_ORDER[i]
 		local bar = self.bars[hand]
-		if native then
+		if db.skin == "native" then
 			bar.bg:SetAtlas(BACKGROUND_ATLAS)
 			bar.border:SetAtlas(BORDER_ATLAS)
 			bar.labelShadow:Show()
@@ -1118,19 +1060,19 @@ end
 -- Text height tracks the bar height (in-play feedback: the fixed small font
 -- read shrunken on tall bars), clamped to sane bounds and capped so large
 -- fonts cannot collide across narrow bars.
-local function BarFontHeight()
+local function BarFontHeight(hand)
 	-- 0.66x keeps the default 18px bar at the original small-font size; the
 	-- cap was lowered 18 -> 14 after in-play feedback that 18px read far too
 	-- large on tall bars.
-	return math.min(math.max(Addon.db.height * 0.66, 9), 14)
+	return math.min(math.max(Addon.db.hands[hand].height * 0.66, 9), 14)
 end
 
 function Bars:ApplyText()
 	local db = Addon.db
-	local fontHeight = BarFontHeight()
 	for i = 1, #HAND_ORDER do
 		local hand = HAND_ORDER[i]
 		local bar = self.bars[hand]
+		local fontHeight = BarFontHeight(hand)
 		bar.label:SetFont(BASE_FONT, fontHeight, "")
 		bar.time:SetFont(BASE_FONT, fontHeight, "")
 		bar.delta:SetFont(BASE_FONT, fontHeight, "")
@@ -1146,19 +1088,18 @@ end
 
 function Bars:ApplyLayout()
 	local db = Addon.db
-	anchor:SetScale(db.scale)
 	for i = 1, #HAND_ORDER do
-		self.bars[HAND_ORDER[i]]:SetSize(db.width, db.height)
+		local hand = HAND_ORDER[i]
+		local cfg = db.hands[hand]
+		local bar = self.bars[hand]
+		bar:SetScale(cfg.scale)
+		bar:SetAlpha(cfg.opacity)
+		bar:SetSize(cfg.width, cfg.height)
 	end
-	self:RestorePosition()
+	-- No position restore here: the positions are EditMode.lua's (per Edit
+	-- Mode layout and hand), and its SetScale hook re-anchors a bar whenever
+	-- its scale changes.
 	self:UpdateVisibility()
-end
-
-function Bars:RestorePosition()
-	local db = Addon.db
-	anchor:ClearAllPoints()
-	local relativeTo = db.relativeTo and _G[db.relativeTo] or UIParent
-	anchor:SetPoint(db.point or "BOTTOM", relativeTo, db.relativePoint or "BOTTOM", db.x or 0, db.y or 0)
 end
 
 function Bars:HasWeapon(hand)
@@ -1178,24 +1119,16 @@ function Bars:HasWeapon(hand)
 	return true
 end
 
-function Bars:Relayout(visible)
-	local db = Addon.db
-	local offset = 0
-	local count = 0
-	for i = 1, #HAND_ORDER do
-		local hand = HAND_ORDER[i]
-		local bar = self.bars[hand]
-		if visible[hand] then
-			bar:ClearAllPoints()
-			bar:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, -offset)
-			offset = offset + db.height + db.gap
-			count = count + 1
-		end
-	end
-	if count > 0 then
-		offset = offset - db.gap
-	end
-	anchor:SetSize(db.width, math.max(offset, 1))
+
+-- Per-hand visibility, as the native bars have it in Edit Mode: "always"
+-- (weapon equipped), "combat", "swinging" (the pre-research model) or
+-- "hidden" (the hand has no bar).
+function Bars:HandVisibility(hand)
+	return Addon.db.hands[hand].visibility
+end
+
+function Bars:HandEnabled(hand)
+	return self:HandVisibility(hand) ~= "hidden"
 end
 
 function Bars:UpdateVisibility()
@@ -1203,24 +1136,27 @@ function Bars:UpdateVisibility()
 	if not db or not self.bars then
 		return
 	end
-	local mode = db.visibility
-	local parked = ParkedValue()
-	local visible = {}
-	local any = false
 	for i = 1, #HAND_ORDER do
 		local hand = HAND_ORDER[i]
 		local bar = self.bars[hand]
-		local show = db.enabled[hand]
-		if show then
-			if self.testing then
-				show = true
-			elseif mode == "always" then
-				show = self:HasWeapon(hand)
-			elseif mode == "combat" then
-				show = Addon.inCombat and self:HasWeapon(hand)
-			else -- "swinging"
-				show = bar.active
-			end
+		local mode = self:HandVisibility(hand)
+		local show
+		if Addon.editMode then
+			-- Edit Mode shows every hand, parked and whatever its visibility
+			-- (as Blizzard's own swing timer does): there is something to
+			-- place, the size sliders have a visible effect, and a hidden
+			-- hand can be switched back on.
+			show = true
+		elseif mode == "hidden" then
+			show = false
+		elseif self.testing then
+			show = true
+		elseif mode == "always" then
+			show = self:HasWeapon(hand)
+		elseif mode == "combat" then
+			show = Addon.inCombat and self:HasWeapon(hand)
+		else -- "swinging"
+			show = bar.active
 		end
 		bar:SetShown(show)
 		if not bar.active then
@@ -1230,33 +1166,17 @@ function Bars:UpdateVisibility()
 			-- sized, so no init-order hazard exists, and the login events
 			-- (entering world, the equipment stream) converge whatever an
 			-- earlier pass could not compute yet.
-			bar.status:SetValue(parked)
+			bar.status:SetValue(ParkedValue())
 			self:UpdateTickPosition(bar)
 		end
-		visible[hand] = show
-		any = any or show
 	end
-	anchor:SetShown(any or not db.locked)
-	overlay:SetShown(not db.locked)
-	self:Relayout(visible)
-end
-
-function Bars:SetLocked(locked)
-	if not self.bars then
-		return
-	end
-	anchor:EnableMouse(not locked)
-	if not locked then
-		anchor:RegisterForDrag("LeftButton")
-	end
-	self:UpdateVisibility()
 end
 
 -- ---------------------------------------------------------------------------
 -- Update loop
 -- ---------------------------------------------------------------------------
 
-anchor:SetScript("OnUpdate", function()
+driver:SetScript("OnUpdate", function()
 	Bars:OnUpdate()
 end)
 
@@ -1267,6 +1187,7 @@ function Bars:OnUpdate()
 	local db = Addon.db
 	local now = GetTime()
 	local draining = db.fill ~= "fill"
+	local showTime, showSpeed = db.showTime, db.showSpeed
 	for i = 1, #HAND_ORDER do
 		local bar = self.bars[HAND_ORDER[i]]
 		if bar.active and bar.speed and bar.speed > 0 then
@@ -1277,7 +1198,7 @@ function Bars:OnUpdate()
 				-- completion, so no interrupt feedback fires - the bar simply
 				-- converges to the parked state the missing STOP owed it.
 				-- SweepStaleLandings runs the same convergence off a ticker
-				-- while the anchor is hidden (no OnUpdate).
+				-- while the bar is hidden (no visibility, no OnUpdate).
 				self:SwingStop(HAND_ORDER[i])
 			else
 				if remaining < 0 then
@@ -1289,13 +1210,13 @@ function Bars:OnUpdate()
 					bar.status:SetValue(1 - remaining / bar.speed)
 				end
 				self:UpdateTickPosition(bar)
-				if db.showTime then
-					if db.showSpeed then
+				if showTime then
+					if showSpeed then
 						bar.time:SetText(format("%.1f / %.2f", remaining, bar.speed))
 					else
 						bar.time:SetText(format("%.1f", remaining))
 					end
-				elseif db.showSpeed then
+				elseif showSpeed then
 					bar.time:SetText(format("%.2f", bar.speed))
 				end
 			end
@@ -1303,11 +1224,12 @@ function Bars:OnUpdate()
 	end
 end
 
--- The visibility-independent half of the stale-landing convergence: OnUpdate
--- only fires while the anchor is shown, but a swing that landed without a
--- STOP (library builds before v2.2.0-beta4 seeded exactly that at login)
--- exists precisely while it is hidden - first login, out of combat, locked
--- UI - no visible bar. This sweep runs off a C_Timer ticker (see Enable)
+-- The visibility-independent half of the stale-landing convergence: the
+-- update loop runs off an always-shown driver, but this sweep stays as the
+-- backstop for a swing that landed without a STOP (library builds before
+-- v2.2.0-beta4 seeded exactly that at login), which exists precisely while it
+-- is hidden - first login, out of combat, out of
+-- Edit Mode - no visible bar. This sweep runs off a C_Timer ticker (see Enable)
 -- and parks the same stale swings regardless of visibility; SwingStop does
 -- the parking, pairing value, tick and text.
 function Bars:SweepStaleLandings()
@@ -1615,13 +1537,24 @@ function Bars:StartTestSwing(hands)
 	local db = Addon.db
 	local now = GetTime()
 	self.testing = true
+	local started = false
 	local swingHands = hands or HAND_ORDER
 	for i = 1, #swingHands do
 		local hand = swingHands[i]
-		if db.enabled[hand] then
+		if self:HandEnabled(hand) then
 			self:SwingStart(hand, TEST_SPEED, now + TEST_SPEED)
 			self.bars[hand].testSwing = true
 			self:ArmTestStop(hand, TEST_SPEED)
+			started = true
+		end
+	end
+	if started then
+		Addon.EditMode:SetPreviewing(true)
+	else
+		-- Nothing to preview (every hand asked for is Hidden): do not hold the
+		-- testing state, which only a landing swing would clear.
+		if not self.testTimers then
+			self.testing = false
 		end
 	end
 end
@@ -1659,16 +1592,19 @@ function Bars:FinishTestSwing(hand)
 		if not pending then
 			self.testTimers = nil
 			self.testing = false
+			Addon.EditMode:SetPreviewing(false)
 		end
 	end
 	self:SwingStop(hand)
 end
 
-function Bars:Test()
+-- `hand` (optional) scopes a preview to one hand - the Edit Mode panel's
+-- selected one; nil runs it on every hand as the slash commands do.
+function Bars:Test(hand)
 	if not self.bars then
 		return
 	end
-	self:StartTestSwing()
+	self:StartTestSwing(hand and { hand } or nil)
 end
 
 -- Effect test modes, so visual feedback changes can be verified without
@@ -1683,7 +1619,7 @@ end
 -- swing already in flight, the effect morphs that swing the same way when
 -- it is the preview's own fake swing (bar.testSwing), and fires the plain
 -- treatment on a real one (combat) - test data never rewrites live state.
--- Used by "/4everswingtimer test <effect>" and the overlay's effect
+-- Used by "/4everswingtimer test <effect>" and the Edit Mode panel's effect
 -- buttons.
 -- The queued preview's fallback duration, used only when the effect fires on
 -- a bar the test does not own (a real combat swing); on the fake swing the
@@ -1721,7 +1657,21 @@ local TEST_DELAY_LEAD = 0.05
 -- gets its own swing window instead of piling onto one bar state.
 local TEST_SEQUENCE_STEP = TEST_SPEED + 0.2
 
-function Bars:TestEffect(effect)
+-- The hands an effect's preview covers: its own hands, narrowed to `hand`
+-- when one is asked for (nil: that hand does not show this effect).
+local function EffectScope(effect, hand)
+	local scope = TEST_EFFECT_HANDS[effect] or HAND_ORDER
+	if not hand then
+		return scope
+	end
+	for i = 1, #scope do
+		if scope[i] == hand then
+			return { hand }
+		end
+	end
+end
+
+function Bars:TestEffect(effect, hand)
 	if not self.bars then
 		return
 	end
@@ -1729,7 +1679,7 @@ function Bars:TestEffect(effect)
 		local sequence = { "interrupt", "haste", "delay", "queued" }
 		for i = 1, #sequence do
 			C_Timer.After(TEST_SEQUENCE_STEP * (i - 1), function()
-				self:TestEffect(sequence[i])
+				self:TestEffect(sequence[i], hand)
 			end)
 		end
 		return
@@ -1739,7 +1689,13 @@ function Bars:TestEffect(effect)
 		return
 	end
 	local db = Addon.db
-	local scope = TEST_EFFECT_HANDS[effect] or HAND_ORDER
+	local scope = EffectScope(effect, hand)
+	if not scope then
+		if effect ~= "all" then
+			Addon:Print("The " .. effect .. " preview does not apply to the " .. hand .. " bar.")
+		end
+		return
+	end
 	-- "Live" must mean genuinely in flight. Library builds before
 	-- v2.2.0-beta4 left a bar active with a landed swing right after a
 	-- reload - the login seed manufactured an uncompletable swing, so the
@@ -1756,7 +1712,7 @@ function Bars:TestEffect(effect)
 	for i = 1, #scope do
 		local hand = scope[i]
 		local bar = self.bars[hand]
-		if bar and db.enabled[hand] and bar.active and bar.expiration and bar.expiration > now then
+		if bar and self:HandEnabled(hand) and bar.active and bar.expiration and bar.expiration > now then
 			live = true
 			break
 		end
@@ -1786,14 +1742,14 @@ function Bars:TestEffect(effect)
 		-- plain treatment; a previous preview's fake swing is morphed by
 		-- FireTestEffect exactly like the scheduled path below morphs the
 		-- fresh one.
-		self:FireTestEffect(effect)
+		self:FireTestEffect(effect, hand)
 		return
 	else
 		delay = TEST_EFFECT_OFFSET
 	end
 	self.effectTestTimer = C_Timer.NewTimer(delay, function()
 		self.effectTestTimer = nil
-		self:FireTestEffect(effect)
+		self:FireTestEffect(effect, hand)
 	end)
 end
 
@@ -1808,14 +1764,14 @@ end
 -- morphed swing, ending its preview on the natural landing. Bars that are
 -- not the test's own fake swings (a real combat swing, or a parked bar)
 -- get the plain treatment instead - test data never rewrites live state.
-function Bars:FireTestEffect(effect)
+function Bars:FireTestEffect(effect, hand)
 	local db = Addon.db
 	local now = GetTime()
-	local scope = TEST_EFFECT_HANDS[effect] or HAND_ORDER
+	local scope = EffectScope(effect, hand)
 	for i = 1, #scope do
 		local hand = scope[i]
 		local bar = self.bars[hand]
-		if bar and db.enabled[hand] then
+		if bar and self:HandEnabled(hand) then
 			local fake = bar.testSwing and bar.active
 			if effect == "interrupt" then
 				if fake then
@@ -1886,9 +1842,11 @@ function Bars:FireTestEffect(effect)
 end
 
 function Bars:ApplyAll()
+	if not self.bars then
+		return
+	end
 	self:ApplySkin()
 	self:ApplyText()
-	self:SetLocked(Addon.db.locked)
 	self:ApplyLayout()
 	-- No parked-value tail: UpdateVisibility re-parks every inactive bar
 	-- (value and tick paired) on each of its passes, and ApplyLayout's pass
@@ -1903,9 +1861,7 @@ function Bars:Debug()
 		Addon:Print("Bars not enabled (library missing).")
 		return
 	end
-	local db = Addon.db
-	print("|cff33ccff" .. Addon.name .. "|r debug: fill=" .. db.fill .. " skin=" .. db.skin
-		.. " height=" .. tostring(db.height) .. " scale=" .. tostring(db.scale))
+	print("|cff33ccff" .. Addon.name .. "|r debug:")
 	for i = 1, #HAND_ORDER do
 		local hand = HAND_ORDER[i]
 		local bar = self.bars[hand]
@@ -1914,8 +1870,9 @@ function Bars:Debug()
 		local pipWidth = bar.pip:GetWidth()
 		local pipLeft = bar.pip:GetLeft() or -1
 		local statusLeft = bar.status:GetLeft() or -1
-		print(format("%s: active=%s value=%.3f statusW=%.1f pipW=%.1f pipShown=%s glowShown=%s queued=%s pipOffsetFromBar=%.1f",
-			hand, tostring(bar.active), value, statusWidth, pipWidth,
+		local cfg = Addon.db.hands[hand]
+		print(format("%s (fill=%s skin=%s height=%d scale=%.2f): active=%s value=%.3f statusW=%.1f pipW=%.1f pipShown=%s glowShown=%s queued=%s pipOffsetFromBar=%.1f",
+			hand, Addon.db.fill, Addon.db.skin, cfg.height, cfg.scale, tostring(bar.active), value, statusWidth, pipWidth,
 			tostring(bar.pip:IsShown()), tostring(bar.queuedGlow:IsShown()), tostring(bar.queued),
 			pipLeft - statusLeft))
 	end
@@ -1930,6 +1887,9 @@ function Bars:Enable(lib)
 		local hand = HAND_ORDER[i]
 		self.bars[hand] = CreateBar(hand)
 	end
+	-- Placement needs the bar frames: positions per Edit Mode layout and hand,
+	-- the Edit Mode handles and panel.
+	Addon.EditMode:Init(self.bars)
 
 	-- Library wiring, following the pattern from the library's own README:
 	-- one handler function per registered event, receiving (event, ...).
@@ -1971,14 +1931,17 @@ function Bars:Enable(lib)
 	local _, class = UnitClass("player")
 	self.meleeSpell = Addon.RANGE_MELEE_SPELLS[strlower(class or "")]
 	self.rangedSpell = RANGE_RANGED_SPELLS[class]
-	if Addon.db.rangeFeedback then
-		ArmRangeChecks()
+	for i = 1, #HAND_ORDER do
+		if Addon.db.hands[HAND_ORDER[i]].rangeFeedback then
+			ArmRangeChecks()
+			break
+		end
 	end
 	self.rangeTicker = C_Timer.NewTicker(RANGE_POLL, function()
 		Bars:UpdateRangeFeedback()
 	end)
 
-	-- Stale-landing convergence must not depend on the anchor being shown:
+	-- Stale-landing convergence must not depend on a bar being shown:
 	-- a hidden frame receives no OnUpdate (see SweepStaleLandings).
 	self.staleTicker = C_Timer.NewTicker(STALE_LANDING_GRACE / 2, function()
 		Bars:SweepStaleLandings()
