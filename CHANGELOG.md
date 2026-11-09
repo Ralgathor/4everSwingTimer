@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The queued-attack highlight now lights for every rank of Heroic Strike,
+  Cleave, Raptor Strike and Maul, not only rank 1: `C_Spell.IsCurrentSpell`
+  matches the exact rank's spell ID, so the list now carries each rank (the
+  library's `next_melee_spells`).
+
 ## [1.0.0-beta6] - 2026-10-15
 
 ### Added

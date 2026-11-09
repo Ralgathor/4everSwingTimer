@@ -511,7 +511,7 @@ wrong by design.
 | MH/OH/ranged bars with weapon gating | v1 (already spec'd) | Universal across all incumbents and the native bar. |
 | Target swing bars | Deferred | Proven demand (WST's headline feature). Originally "no Forever data source"; amended 2026-10-01: `UNIT_COMBAT` inference is feasible (library findings section 8, shipped by LaryIsland, section 10.4), so the deferral is now on scope and cost, not feasibility; library scope if built (10.5). |
 | Hunter "white window" (YaHT) movement state | Partly shipped (1.0.0-beta1) | The "delayed/retry" part shipped as the amber delay treatment on the FAILED_QUIET reschedule, addon-side with no library change; the full white-window model still needs cast-window data the library does not expose yet. |
-| Queued-attack coloring (HS/Cleave) | Shipped (1.0.0-beta1) | `C_Spell.IsCurrentSpell` addon-side, probe-verified on the beta (plain booleans, true with Heroic Strike queued); base IDs 78/845/2973/6807 (Raptor Strike added). Open: LaryIsland passes every rank explicitly, we rely on ranks resolving through the base ID - probe with a high-rank Heroic Strike queued (section 10.5). |
+| Queued-attack coloring (HS/Cleave) | Shipped (1.0.0-beta1) | `C_Spell.IsCurrentSpell` addon-side, probe-verified on the beta (plain booleans, true with Heroic Strike queued); every rank of Heroic Strike, Cleave, Raptor Strike and Maul (the library's `next_melee_spells`; section 10.5). |
 | GCD spark (1.5s ahead of swing) | Rejected on Forever; not v1 anywhere | Cooldown timings are secret values in restricted content (§4.2); on classic flavors WeakAuras covers this. |
 | Latency compensation (SuperSwingTimer, SwedgeTimer) | Rejected | The library's PLAYER_SWING anchoring is event-accurate; latency math adds complexity for no accuracy gain. |
 | Per-class implementations (SwedgeTimer) | Rejected | The library centralizes swing mechanics; class logic in the addon would duplicate it and drift. |
@@ -570,7 +570,7 @@ Addon scope:
 
 | Item | Decision |
 |---|---|
-| Queued highlight rank coverage | Probe `C_Spell.IsCurrentSpell(78)` with a high-rank Heroic Strike queued. If it returns false, mirror the library's full rank list (`next_melee_spells`, 1167-1197) in `QUEUED_SPELLS`. Stays addon-side: the library deferred exposing queue state as public API (library IMPROVEMENT_PLAN). |
+| Queued highlight rank coverage | Resolved: `C_Spell.IsCurrentSpell(78)` is false with a higher rank queued (user report against 1.0.0-beta6), so `QUEUED_SPELLS` mirrors the library's full rank list (`next_melee_spells`, v2.3.0). Stays addon-side: the library deferred exposing queue state as public API (library IMPROVEMENT_PLAN). |
 | In-chat live swing log (ASF `/asf log`, LST `/lst probe`) | Candidate, low priority: a chat mirror of the existing `trace` capture for user support. |
 | Auto Shot clip readout (ASF) | Candidate, low priority, hunter-only: derivable from the library's ranged START times, no library change. |
 | Pixel-grid layer (ASF) | Parked unless the native skin shows seams. |
@@ -595,7 +595,8 @@ library's events change):
 
 Probes for the next in-game session:
 
-1. High-rank Heroic Strike queued, `C_Spell.IsCurrentSpell(78)` (addon).
+1. ~~High-rank Heroic Strike queued, `C_Spell.IsCurrentSpell(78)` (addon).~~
+   Resolved (section 10.5).
 2. ~~Melee swing restarts the ranged reload (library).~~ Confirmed on the
    beta (2026-10-14); deferred until launch shows whether it is a beta bug.
 3. ~~Library open item 10, the `PLAYER_SWING` player-only isolation test~~ -

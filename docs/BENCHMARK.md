@@ -297,10 +297,9 @@ font-swap text-loss bug (`LaryIsland_SwingTimer.lua:193`-`213`).
   `617`): bars recolor while a queued attack (Heroic Strike/Raptor
   Strike/Maul/Cleave, every rank listed explicitly, via
   `C_Spell.IsCurrentSpell` + `ACTIONBAR_UPDATE_STATE`) is up - the same
-  "queued" state our effect stack highlights. We pass base IDs only on the
-  assumption that ranks resolve through the base (`Bars.lua:181`-`188`);
-  one of the two approaches is redundant, and only a probe with a
-  high-rank Heroic Strike queued tells which.
+  "queued" state our effect stack highlights. We first passed base IDs
+  only, assuming ranks resolve through the base; a user report showed
+  they do not, and `QUEUED_SPELLS` now lists every rank.
 - **Ranged cast window** (`LaryIsland_SwingTimer.lua:310`-`318`): the
   0.5 s Auto Shot/wind-up shown as a fill-then-drain phase change with a
   separate cast color, for HUNTER/MAGE/PRIEST/WARLOCK (wands).
@@ -431,11 +430,8 @@ Ranked by relevance to 4everSwingTimer's roadmap:
    tanking/threat checks, damage-strength hand assignment. Library scope
    if ever built (it already has a target unit and registers
    `UNIT_COMBAT`).
-2. **Queued-attack rank coverage** (LST lists every rank; we pass base
-   IDs). Probe `C_Spell.IsCurrentSpell(78)` with a high-rank Heroic Strike
-   queued; if it returns false, our queued highlight misses at higher
-   levels; the fallback is the library's full rank list
-   (`next_melee_spells`, `LibClassicSwingTimerAPI.lua:1167`-`1197`).
+2. ~~**Queued-attack rank coverage**~~ - resolved (see the queued-attack
+   recolor above).
 3. **Live swing-truth logging** (ASF `/asf log`, LST `/lst probe`).
    Landing-vs-due deltas, cast tags, parry logging - complements our
    SavedVariables `trace` with an instant in-chat variant for user

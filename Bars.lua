@@ -178,14 +178,22 @@ local EARLY_LANDING_EPSILON = 0.2
 -- engine-vs-timer race at a natural landing, whose STOP parks the bar
 -- long before the grace elapses.
 local STALE_LANDING_GRACE = 1.0
--- Queued next-melee highlight: while a next-melee ability is queued (base IDs;
--- ranks resolve through the base), the main-hand fill takes the queue color
--- and the pip - the tick riding the fill edge - gets an additive glow,
--- matching the casting bar's lit fill and spark treatment. C_Spell.
--- IsCurrentSpell probe-verified on the beta: plain booleans, true with
--- Heroic Strike queued. The fill swaps to the plain texture while queued
--- because a vertex tint would modulate the native atlas fill's own colors.
-local QUEUED_SPELLS = { 78, 845, 2973, 6807 } -- Heroic Strike, Cleave, Raptor Strike, Maul
+-- Queued next-melee highlight: while a next-melee ability is queued, the
+-- main-hand fill takes the queue color and the pip - the tick riding the
+-- fill edge - gets an additive glow, matching the casting bar's lit fill and
+-- spark treatment. C_Spell.IsCurrentSpell probe-verified on the beta: plain
+-- booleans, true with Heroic Strike queued. The fill swaps to the plain
+-- texture while queued because a vertex tint would modulate the native atlas
+-- fill's own colors.
+-- Every rank is listed: IsCurrentSpell matches the exact rank's ID only - a
+-- base ID does not answer for a higher rank queued. Mirrors the library's
+-- next_melee_spells (v2.3.0).
+local QUEUED_SPELLS = {
+	78, 284, 285, 1608, 11564, 11565, 11566, 11567, 25286, -- Heroic Strike 1-9
+	845, 7369, 11608, 11609, 20569, -- Cleave 1-5
+	2973, 14260, 14261, 14262, 14263, 14264, 14265, 14266, -- Raptor Strike 1-8
+	6807, 6808, 6809, 8972, 9745, 9880, 9881, -- Maul 1-7
+}
 -- The cast bar's own assets (verified in Blizzard_UIPanels_Game on the
 -- forever branch): the fill gradient is baked into the ui-castingbar-filling-
 -- standard atlas, the tick is ui-castingbar-pip, and the glow behind the tick
@@ -734,7 +742,7 @@ function Bars:GetBaseFillColor(bar)
 end
 
 -- Polled at QUEUE_POLL: no event exists for queued-state changes, and
--- IsCurrentSpell is a cheap client-side call (four lookups per tick).
+-- IsCurrentSpell is a cheap client-side call.
 function Bars:UpdateQueued()
 	local db = Addon.db
 	if not db.hands.mainhand.highlightQueued or not IsCurrentSpell then
