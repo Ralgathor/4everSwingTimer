@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-beta7] - 2026-11-09
+
 ### Fixed
 
 - The queued-attack highlight now lights for every rank of Heroic Strike,
